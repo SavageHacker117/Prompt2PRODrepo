@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Example: Live Network Traffic</title>
+  <style>
+    body { background: #1a1a1a; color: #6ff; font-family: monospace; margin: 0; padding: 2rem; }
+    pre { background: #222; padding: 1em; border-radius: 8px; font-size: 1.1em; }
+    h2 { color: #fffd5a; margin-top: 0; }
+  </style>
+</head>
+<body>
+  <h2>Live Network Traffic (Flask API)</h2>
+  <pre id="log">Loading...</pre>
+  <script>
+    const API_BASE = (window.API_BASE || "").replace(/\/$/, "");
+    async function fetchStats() {
+      try {
+        const res = await fetch(`${API_BASE}/api/netstats`, { cache: "no-store" });
+        const data = await res.json();
+        document.getElementById('log').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        document.getElementById('log').textContent = "Error: " + e;
+      }
+    }
+    setInterval(fetchStats, 1000);
+    fetchStats();
+  </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+# Example config for Network Traffic Monitor
+# Safe for public repos — no secrets here
+log_file: netmon.log

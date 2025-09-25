@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Example: Unified System & Service Dashboard</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' data: blob:;">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background: #14181e; color: #f5f5f5; font-family: 'Fira Mono', monospace; margin: 0; padding: 0; }
+    header { padding: 2rem; background: #21242d; }
+    h1 { color: #48ff77; margin: 0 0 0.6em 0; }
+    .grid { display: flex; flex-wrap: wrap; gap: 2rem; padding: 2rem; }
+    .section { background: #22242c; border-radius: 1em; flex: 1 1 320px; min-width: 340px; margin-bottom: 2rem; padding: 1.5rem; }
+    h2 { color: #1ee3ff; }
+    .charts { display: flex; gap: 2rem; flex-wrap: wrap; }
+    canvas { background: #1c1e26; border-radius: 8px; }
+    pre { background: #16181e; border-radius: 6px; padding: 1em; overflow-x: auto; }
+    .live { color: #48ff77; font-weight: bold; animation: blink 1.5s infinite; }
+    @keyframes blink { 50% { opacity: 0.5; } }
+    .stat { font-size: 1.1em; margin: 0.3em 0; }
+    .docker { color: #00bfff; }
+    .err { color: #ff6767; }
+    .warn { color: #ffaa22; font-weight:bold; }
+    #benchBtn, #benchStopBtn { background:#1ee3ff;color:#111;border:none;border-radius:6px;padding:7px 20px;margin-top:1em;font-family:inherit;font-size:1.04em;cursor:pointer; }
+    #benchStopBtn { background:#ff6767;color:white;margin-left:8px; }
+    #tempAlert { font-size: 1.3em; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Example Unified System & Service Dashboard <span class="live">● LIVE</span></h1>
+    <div class="stat">All stats polled every 2s. <b>APIs: Flask (required), Node.js & Docker (optional)</b></div>
+    <div>
+      <button id="benchBtn" onclick="startBenchmark()">🔥 Run Benchmark (CPU Load)</button>
+      <button id="benchStopBtn" onclick="stopBenchmark()">⛔ Emergency Stop</button>
+      <span id="tempAlert"></span>
+    </div>
+  </header>
+  <div class="grid">
+    <div class="section">
+      <h2>Network Traffic</h2>
+      <canvas id="netChart" width="360" height="120"></canvas>
+      <pre id="netstats">Loading...</pre>
+    </div>
+    <div class="section">
+      <h2>Node.js Health</h2>
+      <canvas id="cpuChart" width="360" height="120"></canvas>
+      <div class="stat" id="nodehealth">Loading...</div>
+    </div>
+    <div class="section">
+      <h2>Python/Flask System Stats</h2>
+      <div class="stat" id="pythonstats">Loading...</div>
+      <div class="stat"><b>CPU Temp:</b> <span id="cpuTemp"></span></div>
+      <div class="stat"><b>Top Processes:</b><pre id="topProcs"></pre></div>
+    </div>
+    <div class="section">
+      <h2 class="docker">Docker Containers</h2>
+      <pre id="dockerstats">Loading...</pre>
+    </div>
+  </div>
+  <script>
+    // Optional override for non-root deployments:
+    // window.API_BASE = "/my-prefix";
+  </script>
+  <script src="./dashboard.js"></script>
+</body>
+</html>

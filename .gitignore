@@ -1,4 +1,34 @@
-﻿.DS_Store
+# OS
+.DS_Store
 Thumbs.db
-.vscode/
-.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs & misc
+*.log
+*.pid
+*.seed
+*.bak
+*.tmp
+*.swp
+
+# Build/output
+dist/
+build/
+.cache/
+coverage/

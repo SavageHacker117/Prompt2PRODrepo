@@ -1,7 +1,22 @@
-ï»¿# Prompt2PRODrepo
+# Prompt2PROD (Examples)
 
-Public immutable repo scaffold. Locked PDF to be added later.
+A small, public-safe set of **example apps and docs**.
 
-Next step:
-- Place the locked PDF here.
-- Commit and tag v1.0.
+## Structure
+- \pps/network-traffic\ — Flask API + HTML dashboard example
+- \docs\ — repo documentation & PDFs
+- \ssets/images\ — screenshots and images
+- \scripts\ — helper scripts (dev shortcuts, etc.)
+
+## Quick start (network-traffic)
+\\\ash
+cd apps/network-traffic
+python -m venv .venv && source .venv/bin/activate
+pip install flask flask-cors psutil pyyaml
+./dashboard.sh
+# open http://localhost:8080/dashboard.html
+\\\
+
+## Notes
+- All files are sanitized for public sharing.
+- Add more examples under \pps/\ as you like.
