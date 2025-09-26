@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canvasmind.dev/schemas/dcwo.schema.json",
+  "title": "Direct Context-Wrapping Object",
+  "type": "object",
+  "required": ["id", "context", "policy"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "node": {},
+    "context": {
+      "type": "object",
+      "required": ["semantics", "provenance"],
+      "properties": {
+        "semantics": { "type": "array", "items": { "type": "string" } },
+        "provenance": { "type": "object", "additionalProperties": true },
+        "constraints": { "type": "object", "additionalProperties": true },
+        "acl": {
+          "type": "object",
+          "properties": {
+            "roles": {
+              "type": "object",
+              "additionalProperties": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "additionalProperties": false
+        },
+        "telemetry": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,9 @@
+// Coastline scene in CanvasScript DSL
+scene {
+  biome "coast"
+  sky "stormy"
+  spawn boulder count=10 scale=0.7..1.2
+  spawn driftwood count=4
+  water waves intensity=0.6
+  lighting sun angle=15
+}

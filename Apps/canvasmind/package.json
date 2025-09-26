@@ -1,0 +1,14 @@
+{
+  "name": "canvasmind-root",
+  "private": true,
+  "description": "Root of the CanvasMind mono-repo (web demo + server gateway).",
+  "license": "MIT",
+  "scripts": {
+    "dev:web": "cd apps/demo-web && npm run dev",
+    "build:web": "cd apps/demo-web && npm run build",
+    "preview:web": "cd apps/demo-web && npm run preview",
+    "dev:gateway": "cd server/gateway/fastapi && uvicorn app:app --host 0.0.0.0 --port 8080 --reload",
+    "dev:telemetry": "cd server/telemetry && uvicorn collector:app --host 0.0.0.0 --port 8081 --reload",
+    "dev": "npm run dev:web"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canvasmind.dev/schemas/actions.schema.json",
+  "title": "CanvasMind Actions",
+  "type": "object",
+  "properties": {
+    "version": { "type": "string", "const": "1" },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "skybox.apply",
+              "mesh.spawn",
+              "mesh.transform",
+              "scene.clear",
+              "camera.set",
+              "budget.setCaps"
+            ]
+          },
+          "target": { "type": "string" },
+          "params": { "type": "object", "additionalProperties": true },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "texMemMB": { "type": "number", "minimum": 0 },
+              "tris": { "type": "number", "minimum": 0 },
+              "nodes": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "actions"],
+  "additionalProperties": false
+}
