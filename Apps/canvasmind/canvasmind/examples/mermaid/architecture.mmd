@@ -1,0 +1,16 @@
+flowchart TD
+  subgraph Client
+    A[UI: Index.html] --> B[main.ts]
+    B --> C[init.ts]
+    C --> D[Compiler Passes]
+    C --> E[Runtime + Bus]
+    C --> F[WorldField Plugin]
+  end
+
+  subgraph Server
+    G[FastAPI Gateway] --> H[Registry Sync]
+    G --> I[Telemetry Collector]
+  end
+
+  D --> G
+  E --> I

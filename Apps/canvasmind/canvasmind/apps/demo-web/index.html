@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CanvasMind • Prompt2PROD Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;background:#0a0f18;color:#e6edf3;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    .wrap{display:grid;grid-template-columns:340px 1fr;gap:12px;max-width:1400px;margin:0 auto;padding:12px}
+    .panel{background:#0f1726;border:1px solid #18223a;border-radius:14px;padding:12px}
+    .panel h2{margin:6px 0 8px}
+    .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    #log{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:#0b1222;border:1px solid #18223a;border-radius:10px;padding:8px;max-height:260px;overflow:auto}
+    #hud{position:fixed;left:12px;bottom:12px;display:flex;gap:8px}
+    .chip{background:#0b1222;border:1px solid #1e2a44;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer}
+    canvas{display:block;width:100%;height:75vh;border:1px solid #1a2440;border-radius:14px;background:#050a13}
+    @media (max-width: 900px){ .wrap{grid-template-columns:1fr} canvas{height:60vh} }
+    input[type="text"], input[type="url"], input[placeholder]{outline:none}
+    input::placeholder{color:#8aa2c1}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h2>Prompt2PROD • Controls</h2>
+
+      <!-- React UI renders the full control surface here -->
+      <div id="react-ui"></div>
+
+      <!-- ─── Rose controls ───────────────────────────────────── -->
+      <div class="panel" style="margin-top:12px">
+        <h2>Rose (Character)</h2>
+        <div class="row" style="margin-bottom:6px">
+          <input id="roseUrl" placeholder="/assets/rose.glb"
+                 style="flex:1; padding:6px 8px; border-radius:8px; border:1px solid #18223a; background:#0b1222; color:#e6edf3" />
+        </div>
+        <div class="row" style="margin-bottom:6px">
+          <button id="btnLoadRose" class="chip">Load Rose</button>
+          <button id="btnUnloadRose" class="chip">Unload</button>
+        </div>
+        <div class="row">
+          <button id="btnRoseWalk" class="chip">Walk</button>
+          <button id="btnRoseRun"  class="chip">Run</button>
+          <button id="btnRoseJump" class="chip">Jump</button>
+        </div>
+      </div>
+
+      <!-- ─── Props: TestBall / Remote Ball ───────────────────── -->
+      <div class="panel" style="margin-top:12px">
+        <h2>Props</h2>
+        <div class="row" style="margin-bottom:6px">
+          <button id="btnLoadTestBall" class="chip">Load TestBall</button>
+          <button id="btnUnloadTestBall" class="chip">Unload TestBall</button>
+        </div>
+
+        <div class="row" style="gap:6px">
+          <input id="importedBallUrl" placeholder="https://…/ball.glb"
+                style="flex:1; padding:6px 8px; border-radius:8px; border:1px solid #18223a; background:#0b1222; color:#e6edf3" />
+          <button id="btnLoadImportedBall" class="chip">Load Remote</button>
+          <button id="btnUnloadImportedBall" class="chip">Unload Remote</button>
+        </div>
+      </div>
+
+      <h3 style="margin-top:14px">Log</h3>
+      <div id="log"></div>
+    </div>
+
+    <div class="panel">
+      <!-- React canvas wrapper mounts here -->
+      <div id="react-root" style="width:100%;height:75vh"></div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div class="chip">FPS: <span id="fps">–</span></div>
+    <div class="chip">Draws (est): <span id="draws">–</span></div>
+    <div class="chip">Assets: <span id="assets">0</span></div>
+  </div>
+
+  <!-- React entry (boots Three + mounts the React UI island) -->
+  <script type="module" src="/src/react/main.tsx"></script>
+</body>
+</html>

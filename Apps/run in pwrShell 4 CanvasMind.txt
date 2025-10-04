@@ -1,0 +1,8 @@
+# Launch 4 dev panes in Windows Terminal
+$root = "C:\Users\example\Desktop\canvasmind"
+
+wt `
+  -p "Windows PowerShell" nt -d "$root\server\telemetry" powershell -NoExit "uvicorn collector:app --host 0.0.0.0 --port 8081 --reload" ; `
+  sp -p "Windows PowerShell" -d "$root\server" powershell -NoExit "uvicorn gateway.fastapi.app:app --host 0.0.0.0 --port 8080 --reload" ; `
+  sp -p "Windows PowerShell" -d "$root\server" powershell -NoExit "uvicorn ai.service:app --host 0.0.0.0 --port 8088 --reload" ; `
+  sp -p "Windows PowerShell" -d "$root\apps\demo-web" powershell -NoExit "npm run dev"

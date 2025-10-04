@@ -1,0 +1,35 @@
+# Node / Vite
+node_modules/
+dist/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env & local config
+.env
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript build cache
+tsbuildinfo.tsbuildinfo
+
+# Python / FastAPI side
+__pycache__/
+*.pyc
+.venv/
+.uv/
+.mypy_cache/
+.pytest_cache/
+
+# Docker artifacts
+docker-data/
