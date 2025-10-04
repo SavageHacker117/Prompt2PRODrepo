@@ -1,8 +1,0 @@
-{
-  "op": "worldfield.addInteractee",
-  "uv": [0.25, 0.5],
-  "radius": 0.08,
-  "strength": 0.9,
-  "vx": 0.02,
-  "vy": 0.01
-}

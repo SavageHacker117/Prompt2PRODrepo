@@ -1,8 +1,0 @@
-// Canyon scene in CanvasScript DSL
-scene {
-  biome "desert"
-  sky "clear"
-  spawn rock count=12 scale=0.8..1.3
-  spawn cactus count=6 scale=1.0..2.0
-  lighting sun angle=45
-}
