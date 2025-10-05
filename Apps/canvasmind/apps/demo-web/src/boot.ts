@@ -148,6 +148,49 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0f18);
 
+  // Expose for injectors (PolyHaven/Qwen helpers)
+  (window as any).__CM_SCENE = scene;
+  (window as any).__CM_RENDERER = renderer;
+  (window as any).__CM_INJECT = {
+    async applyTextureToTestBall(maps: Record<string,string>) {
+      const s: THREE.Scene = (window as any).__CM_SCENE;
+      const ball = s.getObjectByName?.("CM_TestBall") as THREE.Mesh | null;
+      if (!ball || !ball.material) return;
+      const loader = new THREE.TextureLoader();
+      if (maps.pbr_albedo) {
+        const t = await loader.loadAsync(maps.pbr_albedo);
+        t.colorSpace = THREE.SRGBColorSpace;
+        (ball.material as any).map = t;
+        (ball.material as any).needsUpdate = true;
+      }
+    },
+    async loadHDRIEnvironment(url: string) {
+      const r: THREE.WebGLRenderer = (window as any).__CM_RENDERER;
+      const s: THREE.Scene = (window as any).__CM_SCENE;
+      const tex = await new THREE.TextureLoader().loadAsync(url);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const pmrem = new THREE.PMREMGenerator(r);
+      s.environment = pmrem.fromEquirectangular(tex).texture;
+      s.background = tex;
+      pmrem.dispose();
+    },
+    async loadGLBModel(url: string) {
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync(url);
+      gltf.scene.traverse((o:any)=>{ if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+      gltf.scene.name = "CM_RemoteModel";
+      (window as any).__CM_SCENE.add(gltf.scene);
+    },
+    unloadGLBModel() {
+      const s: THREE.Scene = (window as any).__CM_SCENE;
+      const node = s.getObjectByName("CM_RemoteModel");
+      if (!node) return;
+      node.traverse((o:any)=>{ if (o.isMesh) { o.geometry?.dispose?.(); (o.material as any)?.dispose?.(); }});
+      node.parent?.remove(node);
+    }
+  };
+
   // Camera + controls
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   camera.position.set(5, 3, 7);
@@ -331,6 +374,16 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   gltfLoader.setDRACOLoader(draco);
   gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
+  // Deterministic scoring fallback (when remote scorer is offline/noisy)
+  function heuristicScore(c: any): number {
+    const tris = c?.budget_hint?.tris_est ?? 20000;
+    const trisScore = Math.max(0, 1 - tris / 300_000);      // favor fewer tris
+    const novelty = ((c?.provenance?.seed ?? 0) % 97) / 97; // light tie-breaker
+    const name = (c?.asset?.url || "").toLowerCase();
+    const nameBias = /(boulder|rock|helmet|crate|barrel)/.test(name) ? 0.05 : 0;
+    return 0.75 * trisScore + 0.20 * novelty + 0.05 * nameBias;
+  }
+
   async function spawnMesh() {
     // backpressure guard
     const s = budgets.stats();
@@ -357,7 +410,14 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       const sSeed = (c.provenance.seed ?? 0) % 997;
       return [t / 100000, p / 100, sSeed / 1000, 1,0,0,0,0,0,0,0,0,0,0,0,0];
     });
-    const scores = await scoreCandidates("http://localhost:8088", feats, 16);
+
+    let scores: number[] | null = null;
+    try {
+      const s = await scoreCandidates("http://localhost:8088", feats, 16);
+      if (Array.isArray(s) && s.some(v => Number.isFinite(v))) scores = s;
+    } catch {}
+    if (!scores) scores = candidates.map(heuristicScore);
+
     let bestIdx = 0; let best = -Infinity;
     scores.forEach((sc, i) => { if (sc > best) { best = sc; bestIdx = i; } });
     const chosen = candidates[bestIdx];
