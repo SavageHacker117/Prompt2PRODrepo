@@ -11,6 +11,8 @@ import { sendTelemetry, scoreCandidates } from "./canvasmind/telemetry/client";
 import { loadRose, unloadRose, playRoseAction, updateRose } from "./three/roseLoader";
 import { loadTestBall, unloadTestBall } from "./canvasmind/plugins/animator/testBall";
 import { loadImportedBall, unloadImportedBall } from "./canvasmind/plugins/animator/importedBall";
+// >>> NEW (grass)
+import { GrassField, GrassOpts } from "./canvasmind/plugins/grass/grassField";
 
 const DEV = true;
 const vlog = (...a: any[]) => DEV && console.info("[CanvasMind]", ...a);
@@ -126,6 +128,9 @@ export type CanvasMindAPI = {
   unloadTestBall(): void;
   loadImportedBall(url: string): Promise<any>;
   unloadImportedBall(): void;
+  // >>> NEW (grass)
+  loadGrass(opts?: GrassOpts): Promise<{blades:number,size:number} | void>;
+  unloadGrass(): void;
 
   getState(): { assets: number; fps: number; draws: number; budget: ReturnType<BudgetManager["stats"]> };
   dispose(): void;
@@ -147,6 +152,9 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   // Scene
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0f18);
+
+  // >>> NEW (grass) handle
+  let grass: GrassField | null = null;
 
   // Expose for injectors (PolyHaven/Qwen helpers)
   (window as any).__CM_SCENE = scene;
@@ -249,18 +257,18 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   const animate = (now: number) => {
     animId = requestAnimationFrame(animate);
 
-    // delta for animation mixers
     const deltaSec = (now - lastRenderNow) / 1000;
     lastRenderNow = now;
 
-    // >>> NEW: advance Rose mixer
     updateRose(deltaSec);
+    // >>> NEW (grass)
+    if (grass) grass.update(deltaSec);
 
     frames++;
     if (now - lastFpsTick >= 1000) {
       fps = frames; frames = 0; lastFpsTick = now;
       draws = renderer.info.render.calls; renderer.info.reset();
-      const b = budgets.stats(); // adaptive quality (downshift when crowded)
+      const b = budgets.stats();
       const crowded = b.nodes > b.caps.nodes * 0.9 || b.mb > b.caps.texMemMB * 0.9;
       dirLight.shadow.mapSize.set(crowded ? 1024 : 2048, crowded ? 1024 : 2048);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio ?? 1, crowded ? 1.25 : 1.75));
@@ -269,10 +277,8 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   };
   animId = requestAnimationFrame(animate);
 
-  // Flush render lists occasionally (micro GC)
   const renderListTimer = setInterval(() => (renderer as any).renderLists?.dispose?.(), 5_000);
 
-  // Context loss guard
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); console.warn("WebGL context lost"); });
   canvas.addEventListener("webglcontextrestored", () => { location.reload(); });
 
@@ -334,7 +340,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     tex.colorSpace = THREE.SRGBColorSpace;
     scene.background = tex;
 
-    // Dispose previous env
     if (lastEnvTex) try { lastEnvTex.dispose(); } catch {}
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envMap = pmrem.fromEquirectangular(tex).texture;
@@ -359,7 +364,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
 
     log(`Skybox applied • model=${out.provenance.model} seed=${out.provenance.seed}`);
 
-    // Telemetry
     void sendTelemetry("http://localhost:8088", {
       prompt: String(out.provenance.prompt ?? promptText),
       candidate: { type: "skybox", model: out.provenance.model, seed: out.provenance.seed },
@@ -374,18 +378,16 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   gltfLoader.setDRACOLoader(draco);
   gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
-  // Deterministic scoring fallback (when remote scorer is offline/noisy)
   function heuristicScore(c: any): number {
     const tris = c?.budget_hint?.tris_est ?? 20000;
-    const trisScore = Math.max(0, 1 - tris / 300_000);      // favor fewer tris
-    const novelty = ((c?.provenance?.seed ?? 0) % 97) / 97; // light tie-breaker
+    const trisScore = Math.max(0, 1 - tris / 300_000);
+    const novelty = ((c?.provenance?.seed ?? 0) % 97) / 97;
     const name = (c?.asset?.url || "").toLowerCase();
     const nameBias = /(boulder|rock|helmet|crate|barrel)/.test(name) ? 0.05 : 0;
     return 0.75 * trisScore + 0.20 * novelty + 0.05 * nameBias;
   }
 
   async function spawnMesh() {
-    // backpressure guard
     const s = budgets.stats();
     if (s.nodes >= s.caps.nodes) { log("Spawn refused (node cap reached)."); return; }
 
@@ -393,7 +395,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     if (!server) throw new Error("No mesh server found");
     log(`Calling MCP ${server.id}/generate_mesh …`);
 
-    // 1) generate a few candidates (K=3 mock)
     const K = 3;
     const candidates: MeshOut[] = [];
     for (let i = 0; i < K; i++) {
@@ -403,7 +404,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       candidates.push(out);
     }
 
-    // 2) simple features → score
     const feats: number[][] = candidates.map(c => {
       const t = c.budget_hint?.tris_est ?? 20000;
       const p = (c.provenance.prompt ?? "").length % 100;
@@ -422,10 +422,8 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     scores.forEach((sc, i) => { if (sc > best) { best = sc; bestIdx = i; } });
     const chosen = candidates[bestIdx];
 
-    // 3) Load chosen GLTF
     const gltf = await gltfLoader.loadAsync(chosen.asset.url);
 
-    // If single mesh, try instancing
     let usedInstancing = false;
     gltf.scene.updateMatrixWorld(true);
     const firstMesh = gltf.scene.getObjectByProperty("type", "Mesh") as THREE.Mesh | null;
@@ -452,7 +450,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       if (instPool.addInstance(entry, m)) { usedInstancing = true; log(`Instanced spawn (policy score=${best.toFixed(3)})`); }
     }
 
-    // Fallback: normal object with LOD
     if (!usedInstancing) {
       const node = makeBasicLOD(gltf.scene);
       node.position.set((Math.random() * 4 - 2), 0, (Math.random() * 4 - 2));
@@ -475,7 +472,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       log(`Mesh spawned (policy score=${best.toFixed(3)}) • model=${chosen.provenance.model} seed=${chosen.provenance.seed}`);
     }
 
-    // 4) Telemetry for the chosen mesh
     await sendTelemetry("http://localhost:8088", {
       prompt: String(chosen.provenance.prompt ?? ""),
       candidate: { type: "mesh", model: chosen.provenance.model, seed: chosen.provenance.seed, score: best },
@@ -484,7 +480,7 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   }
 
   async function batchSpawn(count: number) {
-    const MAX_INFLIGHT = 4; // throttle
+    const MAX_INFLIGHT = 4;
     let inflight = 0, i = 0;
     return new Promise<void>((resolve) => {
       const tick = () => {
@@ -501,23 +497,26 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   }
 
   function clearScene() {
-    // env/background
+    // >>> NEW (grass) ensure grass is removed
+    if (grass) {
+      budgets.untrackByNode(grass.group);
+      grass.removeFrom(scene);
+      grass = null;
+    }
+
     const bg: any = scene.background;
     if (bg?.dispose) try { bg.dispose(); } catch {}
     scene.background = new THREE.Color(0x0a0f18);
     scene.environment = null;
     if (lastEnvTex) { try { lastEnvTex.dispose(); } catch {} lastEnvTex = null; }
 
-    // instancing
     instPool.disposeAll(scene);
 
-    // meshes
     while (rootGroup.children.length) disposeObject3D(rootGroup.children[0]);
 
-    // registry + budgets
     clearDCWOs();
     budgets.clearAll();
-    budgets = new BudgetManager(budgets.caps); // reset book-keeping
+    budgets = new BudgetManager(budgets.caps);
     (renderer as any).renderLists?.dispose?.();
 
     log("Scene cleared.");
@@ -555,19 +554,16 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     return { assets: DCWO_REG.size, fps, draws, budget: budgets.stats() };
   }
 
-  // HTML buttons (if present)
   bindOptionalHtmlUi({
     applySkybox, spawnMesh, batchSpawn, clearScene, screenshot, refreshRegistry
   });
 
-  // init CanvasMind core
   await initCanvasMind({
     scene, renderer,
     features: { worldField: false },
     budgets: { texMemSoftCapMB: budgets.caps.texMemMB, trisSoftCap: budgets.caps.tris }
   });
 
-  // HUD
   const fpsEl = document.getElementById("fps");
   const drawsEl = document.getElementById("draws");
   const assetsEl = document.getElementById("assets");
@@ -594,7 +590,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     setGround,
     setQuality,
 
-    // NEW: public API for Rose + props
     async loadRose(url: string = "/assets/rose.glb") { return loadRose(scene, url); },
     unloadRose() { return unloadRose(scene); },
     playRoseAction(action: "walk" | "run" | "jump", loops = 2) { return playRoseAction(action, loops); },
@@ -602,6 +597,27 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     unloadTestBall() { unloadTestBall(scene); },
     async loadImportedBall(url: string) { return loadImportedBall(scene, url); },
     unloadImportedBall() { unloadImportedBall(scene); },
+
+    // >>> NEW (grass)
+    async loadGrass(opts: GrassOpts = {}) {
+      if (grass) return grass.stats();
+      grass = new GrassField({ size: 12, density: 700, windStrength: 0.6, windSpeed: 1.1, ...opts });
+      grass.addTo(scene);
+      budgets.track({
+        id: "grass_field",
+        kind: "instanced",
+        estMB: Math.min(64, Math.floor((grass.stats().blades * 5) / 4096)),
+        node: grass.group,
+        dispose: () => { grass?.removeFrom(scene); }
+      });
+      return grass.stats();
+    },
+    unloadGrass() {
+      if (!grass) return;
+      grass.removeFrom(scene);
+      budgets.untrackByNode(grass.group);
+      grass = null;
+    },
 
     getState,
     dispose() {
@@ -629,7 +645,6 @@ function bindOptionalHtmlUi(api: {
   refreshRegistry(): Promise<void>;
 }) {
   const $ = (id: string) => document.getElementById(id);
-  // existing controls
   $("btnSkybox")?.addEventListener("click", () => {
     const prompt = (document.getElementById("prompt") as HTMLInputElement | null)?.value?.trim() || "aurora nebula";
     api.applySkybox(prompt);
@@ -649,7 +664,6 @@ function bindOptionalHtmlUi(api: {
     (window as any).CanvasMindApp?.setGround(y, rx, rz);
   }));
 
-  // NEW: Rose + Props buttons
   $("btnLoadRose")?.addEventListener("click", () => {
     const url = (document.getElementById("roseUrl") as HTMLInputElement | null)?.value?.trim() || "/assets/rose.glb";
     (window as any).CanvasMindApp?.loadRose?.(url);
@@ -682,15 +696,5 @@ function bindOptionalHtmlUi(api: {
     (window as any).CanvasMindApp?.unloadImportedBall?.();
   });
 
-  // Hotkeys for dev
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "1") (window as any).CanvasMindApp?.loadRose?.("/assets/rose.glb");
-    if (e.key === "2") (window as any).CanvasMindApp?.playRoseAction?.("walk", 2);
-    if (e.key === "3") (window as any).CanvasMindApp?.playRoseAction?.("run", 2);
-    if (e.key === "4") (window as any).CanvasMindApp?.playRoseAction?.("jump", 1);
-    if (e.key === "0") (window as any).CanvasMindApp?.unloadRose?.();
-
-    if (e.key === "t") (window as any).CanvasMindApp?.loadTestBall?.();
-    if (e.key === "y") (window as any).CanvasMindApp?.unloadTestBall?.();
-  });
+  // (Optional) Add plain HTML buttons with ids btnLoadGrass / btnUnloadGrass if desired.
 }

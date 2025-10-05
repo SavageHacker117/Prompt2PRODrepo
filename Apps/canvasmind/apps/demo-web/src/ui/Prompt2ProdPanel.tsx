@@ -12,6 +12,7 @@ export default function Prompt2ProdPanel() {
   const [ground, setGround] = React.useState({ y: 0, rx: 0, rz: 0 });
   const [state, setState] = React.useState({ fps: 0, draws: 0, assets: 0 });
 
+  // poll HUD numbers
   React.useEffect(() => {
     const t = setInterval(() => {
       const api = (window as any).CanvasMindApp;
@@ -20,8 +21,29 @@ export default function Prompt2ProdPanel() {
     return () => clearInterval(t);
   }, []);
 
+  // local grass UI state (mirrors shader params)
+  const [grass, setGrass] = React.useState({
+    size: 12,          // patch size (meters)
+    density: 700,      // instances per patch
+    bladeHeight: 0.35, // meters
+    windStrength: 0.6, // sway amplitude
+    windSpeed: 1.1     // sway speed
+  });
+
+  // push any changed knob to the engine (debounced via requestAnimationFrame)
+  const scheduleGrassUpdate = React.useRef<number | null>(null);
+  const pushGrass = (partial?: Partial<typeof grass>) => {
+    const next = { ...grass, ...(partial || {}) };
+    setGrass(next);
+    if (scheduleGrassUpdate.current) cancelAnimationFrame(scheduleGrassUpdate.current);
+    scheduleGrassUpdate.current = requestAnimationFrame(() => {
+      call(api => api.loadGrass?.(next));
+    });
+  };
+
   return (
     <div style={{ display: "grid", gap: 10 }}>
+      {/* Prompt + actions */}
       <input
         value={prompt}
         onChange={(e)=>setPrompt(e.target.value)}
@@ -36,12 +58,14 @@ export default function Prompt2ProdPanel() {
         <button onClick={()=>call(api=>api.screenshot())}>Screenshot</button>
       </div>
 
+      {/* MCP */}
       <h3 style={{margin:"8px 0 4px"}}>MCP Servers</h3>
-      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <button onClick={()=>call(api=>api.refreshRegistry())}>Refresh Registry</button>
         <span style={{opacity:.7,fontSize:12}}>Assets: {state.assets}</span>
       </div>
 
+      {/* Batch */}
       <h3 style={{margin:"8px 0 4px"}}>Batch</h3>
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
         <input
@@ -53,6 +77,7 @@ export default function Prompt2ProdPanel() {
         <button onClick={()=>call(api=>api.batchSpawn(batch))}>Spawn {batch}</button>
       </div>
 
+      {/* Ground */}
       <h3 style={{margin:"8px 0 4px"}}>Ground Align</h3>
       <label style={{fontSize:12,opacity:.85,display:"flex",gap:6,alignItems:"center"}}>
         Height
@@ -75,6 +100,55 @@ export default function Prompt2ProdPanel() {
           onChange={(e)=>{ const rz=parseFloat(e.target.value); setGround(g=>({...g,rz})); call(api=>api.setGround(ground.y, ground.rx, rz)); }}
         />
       </label>
+
+      {/* Grass */}
+      <h3 style={{margin:"10px 0 6px"}}>Grass</h3>
+      <div style={{display:"grid", gap:8}}>
+        <label style={{display:"grid", gridTemplateColumns:"110px 1fr", alignItems:"center", gap:8}}>
+          <span>Patch Size</span>
+          <input
+            type="range" min={6} max={24} step={1} value={grass.size}
+            onChange={(e)=>pushGrass({ size: Number(e.target.value) })}
+          />
+        </label>
+
+        <label style={{display:"grid", gridTemplateColumns:"110px 1fr", alignItems:"center", gap:8}}>
+          <span>Density</span>
+          <input
+            type="range" min={200} max={1200} step={50} value={grass.density}
+            onChange={(e)=>pushGrass({ density: Number(e.target.value) })}
+          />
+        </label>
+
+        <label style={{display:"grid", gridTemplateColumns:"110px 1fr", alignItems:"center", gap:8}}>
+          <span>Blade Height</span>
+          <input
+            type="range" min={0.15} max={0.7} step={0.01} value={grass.bladeHeight}
+            onChange={(e)=>pushGrass({ bladeHeight: Number(e.target.value) })}
+          />
+        </label>
+
+        <label style={{display:"grid", gridTemplateColumns:"110px 1fr", alignItems:"center", gap:8}}>
+          <span>Wind Strength</span>
+          <input
+            type="range" min={0} max={1.5} step={0.01} value={grass.windStrength}
+            onChange={(e)=>pushGrass({ windStrength: Number(e.target.value) })}
+          />
+        </label>
+
+        <label style={{display:"grid", gridTemplateColumns:"110px 1fr", alignItems:"center", gap:8}}>
+          <span>Wind Speed</span>
+          <input
+            type="range" min={0} max={2.0} step={0.01} value={grass.windSpeed}
+            onChange={(e)=>pushGrass({ windSpeed: Number(e.target.value) })}
+          />
+        </label>
+
+        <div style={{display:"flex", gap:8, flexWrap:"wrap", alignItems:"center", marginTop:4}}>
+          <button onClick={()=>call(api=>api.loadGrass?.(grass))}>Load Grass</button>
+          <button onClick={()=>call(api=>api.unloadGrass?.())}>Unload Grass</button>
+        </div>
+      </div>
     </div>
   );
 }
