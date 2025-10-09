@@ -1,8 +1,7 @@
 import React, { useCallback, useRef } from "react";
-import { useGame } from "../context/GameContext.jsx";
-import HUD from "../components/HUD.jsx";
-import GameCanvas from "../components/GameCanvas.jsx";
-import NeRFViewer from "../components/NeRFViewer.jsx";
+import { useGame } from "@/context/GameContext.jsx";
+import HUD from "@/components/HUD.jsx";
+import GameCanvas from "@/components/GameCanvas.jsx";
 
 export default function GameScene() {
   const { level, shots, setShots, nextLevel, endGame, setScore, addShots, settings = {} } = useGame();
@@ -27,9 +26,6 @@ export default function GameScene() {
         onConsumeShot={onConsume}
         onSceneReady={onScene}
       />
-      {settings.nerfEnabled && (
-        <NeRFViewer scene={sceneRef.current} enabled={true} quality={settings.nerfQuality || "medium"} />
-      )}
     </div>
   );
 }

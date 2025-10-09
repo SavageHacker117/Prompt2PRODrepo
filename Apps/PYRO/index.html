@@ -10,28 +10,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet"/>
 
-    <!-- Optional FLS Floating Header (commented out for local dev)
+    <!-- Optional floating site header (keep commented for local dev) -->
+    <!--
     <link rel="stylesheet" href="/assets/site-header.css">
     <script defer src="/assets/site-header.js"></script>
     -->
-    <!-- The placement of these two lines follows your floating-header guidance. -->
-    <!-- See: floating header notes. --> <!--  -->
 
-    <!-- Loader styles (FLS-styled) -->
+    <!-- Loader styles -->
     <link rel="stylesheet" href="/src/styles/loader.css" />
   </head>
   <body>
-    <!-- Optional global header (if you enable it site-wide) -->
     <div class="fls-header-spacer"></div>
 
-    <!-- Branded loader (created programmatically by /src/loader.js) -->
+    <!-- Branded loader mounts here -->
     <div id="fls-loader-mount"></div>
 
     <!-- React root -->
     <div id="root"></div>
 
-    <!-- FLS-styled loader script (IIFE) -->
-    <script type="module" src="/src/loader.js"></script>
+    <!-- Classic (non-module) loader so Vite won't parse it -->
+    <script src="/loader.js"></script>
+
     <!-- App entry -->
     <script type="module" src="/src/main.jsx"></script>
   </body>

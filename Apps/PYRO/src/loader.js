@@ -42,12 +42,9 @@
     setTimeout(() => loader.remove(), 1000);
   }
 
-  // auto-hide as a fallback (3.5s)
+  // auto-hide fallback
   window.addEventListener('load', () => setTimeout(hide, 3500));
 
-  // programmatic control for when the first frame is rendered
-  window.FLSLoader = {
-    hide,
-    el: loader,
-  };
+  // programmatic control
+  window.FLSLoader = { hide, el: loader };
 })();

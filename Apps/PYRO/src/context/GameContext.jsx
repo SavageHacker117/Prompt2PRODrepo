@@ -1,33 +1,37 @@
-import React, { createContext, useContext, useMemo, useState } from 'react'
-import meta from '../data/levels.json'
+import React, { createContext, useContext, useMemo, useState } from "react";
 
-const Ctx = createContext(null)
-export const useGame = () => useContext(Ctx)
+const GameCtx = createContext(null);
 
 export function GameProvider({ children }) {
-  const [screen, setScreen] = useState('menu') // 'menu' | 'game' | 'over'
-  const [level, setLevel] = useState(1)
-  const [score, setScore] = useState(0)
-  const [shots, setShots] = useState(2)
-  const [best, setBest] = useState(0)
-  const [settings, setSettings] = useState({ animations: true })
+  const [level, setLevel]   = useState(1);
+  const [shots, setShots]   = useState(5);
+  const [score, setScore]   = useState(0);
+  const [settings, setSettings] = useState({
+    preset: "Medium",
+    animations: true,
+    trail: true,
+    caustics: true,
+    bloom: true,
+    bloomStrength: 0.85,
+    fireballGlow: 0.65,
+    exposure: 1.0,
+    showModelLab: false,
+  });
 
-  const startGame = () => { setScore(0); setShots(2); setLevel(1); setScreen('game') }
-  const nextLevel = () => {
-    const next = level + 1
-    if (next > meta.levels.length) endGame()
-    else { setLevel(next); setShots(2) }
-  }
-  const endGame = () => { setScreen('over'); setBest(b => Math.max(b, score)) }
-  const toggleAnimations = () => setSettings(s => ({...s, animations: !s.animations}))
-  const addShots = (n=1) => setShots(x => x + n)
+  const nextLevel = () => setLevel(l => Math.min(99, l + 1));
+  const endGame   = () => setLevel(1);
+
+  const addShots = (inc=1) => setShots(n => n + inc);
 
   const value = useMemo(() => ({
-    screen, setScreen, level, setLevel,
-    score, setScore, shots, setShots, addShots,
-    best, startGame, nextLevel, endGame,
-    meta, settings, toggleAnimations
-  }), [screen, level, score, shots, best, settings])
+    level, setLevel,
+    shots, setShots,
+    score, setScore,
+    settings, setSettings,
+    nextLevel, endGame, addShots
+  }), [level, shots, score, settings]);
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return <GameCtx.Provider value={value}>{children}</GameCtx.Provider>;
 }
+
+export function useGame(){ return useContext(GameCtx); }
