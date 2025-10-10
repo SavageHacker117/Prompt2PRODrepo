@@ -1,0 +1,27 @@
+// Drop-in patch notes for your existing src/scenes/PlinkoScene.js
+// 1) Import the new animation system near the top:
+//    import { EffectsManager } from '../game/anim.js';
+//    import { EFFECTS } from '../game/effects.js';
+//    import { ASSETS } from '../game/assets.js';
+//
+// 2) In your scene init / constructor, create the manager:
+//    this.fx = new EffectsManager(this.scene);
+//
+// 3) When a ball hits a peg, call (example):
+//    EFFECTS.impactSmall(this.fx, ballMesh.position.clone(), 0.9);
+//    EFFECTS.sparks(this.fx, ballMesh.position.clone(), 0.8);
+//
+// 4) When a ball lands in a bucket, call:
+//    EFFECTS.shockwave(this.fx, bucketMesh.position.clone(), 1.3);
+//    EFFECTS.ripple(this.fx, bucketMesh.position.clone(), 1.1);
+//    EFFECTS.ringPulse(this.fx, bucketMesh.position.clone(), 1.0);
+//
+// 5) In your update loop, step the effect manager with delta time:
+//    this.fx.update(deltaSeconds);
+//
+// 6) To place tokens or UI sprites using existing images, import makeSprite from RenderUtils:
+//    import { makeSprite } from '../game/RenderUtils.js';
+//    const blue = makeSprite(ASSETS.amarions.blue, { position: new THREE.Vector3(0,2,0), scale: 0.8 });
+//    this.scene.add(blue);
+//
+// This keeps your gameplay logic intact and simply adds animated VFX driven by your existing PNG frames.

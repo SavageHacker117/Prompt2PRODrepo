@@ -1,0 +1,8 @@
+// In your main game loop (GameEngine.js), ensure you pass deltaSeconds to the current scene update:
+// requestAnimationFrame(t => {
+//   const dt = (t - last) / 1000;
+//   last = t;
+//   currentScene.update(dt);
+// });
+//
+// And ensure your PlinkoScene.update(dt) now calls this.fx.update(dt).

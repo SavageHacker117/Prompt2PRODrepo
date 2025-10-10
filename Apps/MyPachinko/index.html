@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Delano Pachinko — Flash Lightning Studios</title>
+    <link rel="icon" href="/favicon.ico" />
+    <style>
+      :root { color-scheme: dark; }
+      html,body,#app { height:100%; margin:0; }
+      body { background:#0b0d12; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; overflow:hidden; }
+
+      #bgVideo{
+        position: fixed; inset: 0;
+        width:100%; height:100%;
+        object-fit: cover;
+        z-index: -1;
+        filter: saturate(1.05) brightness(0.9);
+      }
+
+      .hud {
+        position:fixed; inset: 0 0 auto 0; height:72px;
+        display:flex; align-items:center; gap:12px;
+        padding:10px 16px;
+        background: linear-gradient(180deg, rgba(10,12,16,.85), rgba(10,12,16,0));
+        color:#e6e9ff; pointer-events:none;
+        z-index: 10;
+      }
+      .hud .brand { display:flex; gap:10px; align-items:center; }
+      .hud .pill { pointer-events:auto; padding:6px 10px; border-radius:10px; background:#141824; border:1px solid #263047; }
+      .hud .money { font-weight:700; }
+      .hud .score { font-weight:700; margin-left:auto; }
+
+      .controls {
+        position:fixed; left:0; right:0; bottom:18px;
+        display:flex; justify-content:center; gap:10px; pointer-events:none; z-index: 9;
+      }
+      .btn {
+        pointer-events:auto; cursor:pointer;
+        padding:10px 16px; border-radius:12px;
+        background:#1b1f2b; border:1px solid #2a3245; color:#e6e9ff;
+      }
+
+      .side-rail{
+        position:fixed; top:80px; bottom:100px; width:240px;
+        background: linear-gradient(180deg, rgba(20,24,36,.35), rgba(20,24,36,.15));
+        border:1px solid #222a3b; border-radius:14px;
+        box-shadow: 0 6px 20px rgba(0,0,0,.25) inset;
+        z-index: 8; backdrop-filter: blur(6px);
+        overflow: hidden;
+      }
+      .side-rail.left  { left:16px; }
+      .side-rail.right { right:16px; }
+      .side-rail h4 { margin:10px 12px; font-weight:600; font-size:14px; color:#cbd3ff; }
+      .side-rail .stub { margin: 0 12px 8px 12px; font-size:12px; color:#98a2c4; }
+
+      /* asset list */
+      .asset { font-size:11px; color:#b9c6ff; padding:2px 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.9; }
+      .asset:nth-child(odd){ background: rgba(255,255,255,.03); }
+
+      #toast{
+        position:fixed; left:50%; transform:translateX(-50%); top:84px;
+        background:#1a1f2b; border:1px solid #2c3650; color:#e6e9ff;
+        padding:8px 12px; border-radius:10px; opacity:0; transition:opacity .2s; z-index:11;
+      }
+      #toast.show{ opacity:1; }
+
+      #debugHud{
+        position:fixed; right:18px; top:78px; z-index:11;
+        font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color:#a7b6ff; background:#0f1320; border:1px solid #243052; padding:6px 8px; border-radius:8px; opacity:.9;
+      }
+    </style>
+  </head>
+  <body>
+    <video id="bgVideo" src="/assets/videos/WaterDragon.mp4" autoplay muted loop playsinline></video>
+
+    <div id="app"></div>
+
+    <div class="hud">
+      <div class="brand">
+        <img src="/logo_256.png" alt="FLS" width="40" height="40" />
+        <strong>Delano Pachinko — Flash Lightning Studios</strong>
+      </div>
+
+      <span class="pill">Ball: $0.10</span>
+
+      <label class="pill" style="display:flex;align-items:center;gap:8px;">
+        Graphics:
+        <select id="gfxQuality">
+          <option value="low">Low (256)</option>
+          <option value="medium" selected>Medium (512)</option>
+          <option value="high">High (1024)</option>
+        </select>
+      </label>
+
+      <label class="pill" style="display:flex;align-items:center;gap:8px;">
+        Camera:
+        <select id="camMode">
+          <option value="front">Front</option>
+          <option value="tilt" selected>Tilt</option>
+          <option value="side">Side</option>
+          <option value="free">Free</option>
+        </select>
+        <button class="btn" id="btnFreeCam" style="padding:6px 10px;">Free</button>
+      </label>
+
+      <span class="pill money">Bank: <span id="hudMoney">$0.00</span></span>
+      <span class="score">Score: <span id="hudScore">$0</span></span>
+    </div>
+
+    <div id="toast"></div>
+    <div id="debugHud">Balls: 0 | Amarions: 0 | FX: 0</div>
+
+   <!-- Left rail stays the same -->
+    <aside class="side-rail left">
+      <h4>Left Rail</h4>
+      <div class="stub">Space for AI scenes, banners, etc.</div>
+    </aside>
+
+    <!-- Right rail: diagnostics widgets -->
+    <aside class="side-rail right">
+     <h4>Right Rail</h4>
+     <div class="stub">Diagnostics / future widgets.</div>
+     <h4 style="margin-top:10px;">Assets (recent)</h4>
+      <ul id="assetList" style="margin:6px 12px 0 12px; padding-left:16px; font-size:12px; color:#c9d2ff;"></ul>
+    </aside>
+
+    <div class="controls">
+      <button class="btn" id="btnDrop">Drop Ball</button>
+      <button class="btn" id="btnSpawnAmarion">Spawn Amarion</button>
+      <button class="btn" id="btnAdd$5">Add $5</button>
+      <button class="btn" id="btnClear">Clear</button>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
