@@ -1,0 +1,5 @@
+[
+  { "dropTableId": "t1", "entries": [{ "itemId": "basalt_ore", "weight": 1, "min": 1, "max": 1 }] },
+  { "dropTableId": "t2", "entries": [{ "itemId": "ice_crystal", "weight": 1, "min": 1, "max": 1 }] },
+  { "dropTableId": "t3", "entries": [{ "itemId": "iron_nodule", "weight": 1, "min": 1, "max": 1 }] }
+]

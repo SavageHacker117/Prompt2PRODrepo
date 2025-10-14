@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SuperDig — FLASH LIGHTNING STUDIOS</title>
+
+    <!-- Fonts & Tailwind (from FLS template) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+      html, body, #root { height:100%; margin:0; }
+      body { background:#05080f; color:#eef3ff; font-family: Inter, system-ui, sans-serif; }
+      /* ===== FLS Topbar (from template) ===== */
+      .fls-topbar{position:fixed;inset:auto 0 0 0;top:0;height:64px;z-index:10000;display:flex;align-items:center;justify-content:center;background:linear-gradient(90deg,#ffd84d,#ff9b3d);box-shadow:0 6px 22px rgba(0,0,0,.35);font-family:Orbitron,sans-serif}
+      .fls-topbar .inner{width:min(1200px,92vw);display:flex;justify-content:space-between;align-items:center}
+      .fls-brand{display:flex;gap:10px;align-items:center;font-weight:700;color:#0b1020}
+      .fls-logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#fff,#ffefc2);box-shadow:0 4px 14px rgba(0,0,0,.25), inset 0 0 8px rgba(255,255,255,.6)}
+      .fls-nav{display:flex;gap:12px}
+      .fls-nav a{text-decoration:none;font-weight:700;font-size:14px;padding:6px 12px;border-radius:8px;color:#0b1020;background:rgba(255,255,255,.25);border:1px solid rgba(0,0,0,.1)}
+      .fls-nav a:hover{background:rgba(255,255,255,.45)}
+      .fls-header-spacer{height:64px}
+
+      /* ===== Loader (from loader.js notes) ===== */
+      .loader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#05080f;color:#fff;font-family:Orbitron,sans-serif;transition:opacity 1s ease,visibility 1s ease}
+      .loader.fade-out{opacity:0;visibility:hidden}
+      .badge{display:flex;align-items:center;gap:14px;padding:18px 22px;border-radius:14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);box-shadow:0 16px 40px rgba(0,0,0,0.45)}
+      .bolt{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#ffd84d,#ff9b3d);box-shadow:0 10px 30px rgba(255,216,77,0.35), inset 0 0 14px rgba(255,255,255,0.35);display:grid;place-items:center;animation:boltPulse 1.2s ease-in-out infinite}
+      .bolt svg{width:26px;height:26px;fill:#111}
+      @keyframes boltPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 6px rgba(255,230,0,.6))}50%{transform:scale(1.06);filter:drop-shadow(0 0 12px rgba(255,230,0,1))}}
+      .bar{margin-top:10px;width:260px;height:8px;background:rgba(255,255,255,0.15);border-radius:4px;overflow:hidden}
+      .bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#ffd84d,#ff9b3d,#ffef9d);animation:load 3.5s linear forwards}
+      @keyframes load{to{width:100%}}
+
+      /* Game mount sizing */
+      #root{position:relative; height: calc(100% - 64px);}
+    </style>
+  </head>
+  <body>
+    <!-- FLS header -->
+    <header class="fls-topbar">
+      <div class="inner">
+        <div class="fls-brand"><div class="fls-logo"></div> FLASH LIGHTNING STUDIOS</div>
+        <nav class="fls-nav">
+          <a href="/">Home</a>
+          <a href="/arcade/">Arcade</a>
+          <a href="https://rift.flsgames.com/RiftRPG/">RiftRPG</a>
+          <a href="https://notes.flsgames.com/">Notes</a>
+        </nav>
+      </div>
+    </header>
+    <div class="fls-header-spacer"></div>
+
+    <!-- Branded loader -->
+    <div class="loader" id="loader">
+      <div>
+        <div class="badge">
+          <div class="bolt">
+            <svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"></path></svg>
+          </div>
+          <div>
+            <h1 style="margin:0">FLASH LIGHTNING STUDIOS</h1>
+            <div class="bar"><i></i></div>
+          </div>
+        </div>
+        <div style="text-align:center;color:#9bb0d0;font-size:12px;margin-top:6px">Arcade initializing…</div>
+      </div>
+    </div>
+
+    <!-- Ad slot (plug your AdSense script in your prod build step) -->
+    <div id="ad-top" class="mx-auto my-2" style="max-width:970px;height:90px"></div>
+
+    <!-- Game mount -->
+    <div id="root"></div>
+
+    <!-- Vite entry -->
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Loader hide (from notes) -->
+    <script>
+      (function(){
+        const loader = document.getElementById('loader');
+        function hideLoader(){ const bolt = loader.querySelector('.bolt'); bolt && (bolt.style.animationDuration='0.25s'); setTimeout(()=>loader.classList.add('fade-out'),250); setTimeout(()=>loader.remove(),1250); }
+        window.addEventListener('load', ()=> setTimeout(hideLoader, 1200)); // quicker in dev
+      })();
+    </script>
+  </body>
+</html>

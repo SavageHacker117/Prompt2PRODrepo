@@ -1,0 +1,5 @@
+[
+  { "itemId": "basalt_ore",   "base": 10, "rarity": 1.0, "biomeMod": 1.0, "purityMaxPct": 0.05 },
+  { "itemId": "ice_crystal",  "base": 18, "rarity": 1.2, "biomeMod": 1.0, "purityMaxPct": 0.05 },
+  { "itemId": "iron_nodule",  "base": 28, "rarity": 1.5, "biomeMod": 1.0, "purityMaxPct": 0.05 }
+]

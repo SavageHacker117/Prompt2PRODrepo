@@ -1,0 +1,5 @@
+[
+  { "levelId": 0, "name": "Surface Hub", "biome": "homebase", "chunkSize": [20,30,6], "soil": 6, "crust": 18, "reservoirCount": 0 },
+  { "levelId": 1, "name": "Basalt Belt", "biome": "basalt", "chunkSize": [20,30,6], "soil": 6, "crust": 18, "reservoirCount": 1 },
+  { "levelId": 2, "name": "BioDome Rim", "biome": "ice", "chunkSize": [20,30,6], "soil": 6, "crust": 18, "reservoirCount": 1 }
+]

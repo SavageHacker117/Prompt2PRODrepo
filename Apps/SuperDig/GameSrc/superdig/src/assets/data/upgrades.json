@@ -1,0 +1,4 @@
+[
+  { "upgradeId": "fuel_t1", "tier": 1, "costCR": 100, "prereq": null, "effects": { "fuelMax": 20 } },
+  { "upgradeId": "drill_t1","tier": 1, "costCR": 120, "prereq": null, "effects": { "drillDmg": 1 } }
+]

@@ -1,0 +1,5 @@
+[
+  { "tileId": "basalt", "biome": "basalt", "hp": 2, "hardness": 1, "dropTableId": "t1" },
+  { "tileId": "ice", "biome": "ice", "hp": 3, "hardness": 2, "dropTableId": "t2" },
+  { "tileId": "metal", "biome": "metal", "hp": 4, "hardness": 3, "dropTableId": "t3" }
+]

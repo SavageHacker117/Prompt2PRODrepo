@@ -1,0 +1,96 @@
+{
+  "animations": {
+    "environment_lava": {
+      "path": "/mnt/data/superdig_next_set/animations/environment_lava_sheet_32x32_f8.png",
+      "frameSize": [
+        32,
+        32
+      ],
+      "frames": 8
+    },
+    "fx_explosion": {
+      "path": "/mnt/data/superdig_next_set/animations/fx_explosion_sheet_64x64_f12.png",
+      "frameSize": [
+        64,
+        64
+      ],
+      "frames": 12
+    },
+    "fx_smoke": {
+      "path": "/mnt/data/superdig_next_set/animations/fx_smoke_sheet_64x64_f12.png",
+      "frameSize": [
+        64,
+        64
+      ],
+      "frames": 12
+    },
+    "fx_sparks": {
+      "path": "/mnt/data/superdig_next_set/animations/fx_sparks_sheet_64x64_f8.png",
+      "frameSize": [
+        64,
+        64
+      ],
+      "frames": 8
+    }
+  },
+  "scaled2x": [
+    "/mnt/data/superdig_next_set/pack_2x/environment/environment-regolith-tile-soft-soil.png",
+    "/mnt/data/superdig_next_set/pack_2x/environment/environment-basalt-tile-hard-stone.png",
+    "/mnt/data/superdig_next_set/pack_2x/environment/environment-lava-pool-surface-vein.png",
+    "/mnt/data/superdig_next_set/pack_2x/environment/environment-void-space-dug-tunnel.png",
+    "/mnt/data/superdig_next_set/pack_2x/environment/environment-bedrock-undiggable.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-green-crystal-emerald-like.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-blue-crystal-sapphire-icy.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-yellow-ore-shards-amber-gold-bits.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-goldium-bar-ingot-icon.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-silverium-nugget-nugget-icon.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-platinum-chunk-dense-metal.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-ironium-rock-base-metal.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-bronzium-ore-coppery.png",
+    "/mnt/data/superdig_next_set/pack_2x/resource/resource-einsteinium-vial-exotic.png",
+    "/mnt/data/superdig_next_set/pack_2x/actor/actor-drill-pod-red-chassis.png",
+    "/mnt/data/superdig_next_set/pack_2x/actor/actor-digger-rig-yellow.png",
+    "/mnt/data/superdig_next_set/pack_2x/actor/actor-digger-rig-teal.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-hud-meters-hull-&-fuel-canisters.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-currency-readout-cash-display.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-depth-indicator-ft-readout.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-cheater-tag-skull-overlay.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-portrait-panels-player-frames.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-bomb-hotbar-explosive-slots.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-on-screen-callout-'used-t-bomb'.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-inventory-panel-inventory-7000.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-repair-meter-current-hull-bar.png",
+    "/mnt/data/superdig_next_set/pack_2x/ui/ui-buy-buttons-$50-$100-$200-$500-total-repair.png",
+    "/mnt/data/superdig_next_set/pack_2x/equipment/equipment-amazonite-drill-tiered-upgrade.png",
+    "/mnt/data/superdig_next_set/pack_2x/equipment/equipment-energy-shielded-hull-defense.png",
+    "/mnt/data/superdig_next_set/pack_2x/equipment/equipment-v16-jag-engine-powerplant.png",
+    "/mnt/data/superdig_next_set/pack_2x/equipment/equipment-liquid-compression-tank-fuel-system.png",
+    "/mnt/data/superdig_next_set/pack_2x/equipment/equipment-tri-turbine-freon-array-cooling.png",
+    "/mnt/data/superdig_next_set/pack_2x/equipment/equipment-leviathan-bay-cargo.png",
+    "/mnt/data/superdig_next_set/pack_2x/station/station-emendation-station-3500-repair-buy.png",
+    "/mnt/data/superdig_next_set/pack_2x/item/item-plastic-explosives-c-to-use.png",
+    "/mnt/data/superdig_next_set/pack_2x/item/item-dynamite-basic-bomb.png",
+    "/mnt/data/superdig_next_set/pack_2x/item/item-t-bomb-shaped-charge.png",
+    "/mnt/data/superdig_next_set/pack_2x/item/item-fuel-canister-consumable.png",
+    "/mnt/data/superdig_next_set/pack_2x/item/item-teleporter-beacon-recall.png",
+    "/mnt/data/superdig_next_set/pack_2x/item/item-compressor-charge-cargo-press.png",
+    "/mnt/data/superdig_next_set/pack_2x/item/item-freeze-bomb-coolant.png",
+    "/mnt/data/superdig_next_set/pack_2x/fx/fx-drill-sparks-impact-spray.png",
+    "/mnt/data/superdig_next_set/pack_2x/fx/fx-explosion-core-fireball.png",
+    "/mnt/data/superdig_next_set/pack_2x/fx/fx-smoke-plume-vehicle-exhaust.png",
+    "/mnt/data/superdig_next_set/pack_2x/fx/fx-loot-pop-pickup-twinkle.png",
+    "/mnt/data/superdig_next_set/pack_2x/font/font-hud-numeric-seven-seg-style.png",
+    "/mnt/data/superdig_next_set/pack_2x/font/font-panel-label-tech-stencil.png",
+    "/mnt/data/superdig_next_set/pack_2x/collectible/collectible-emerald-gem.png",
+    "/mnt/data/superdig_next_set/pack_2x/collectible/collectible-artifact-shard-mystery.png",
+    "/mnt/data/superdig_next_set/pack_2x/biome/biome-shallow-layer-surface-soil.png",
+    "/mnt/data/superdig_next_set/pack_2x/biome/biome-deep-magma-layer-hot-zone.png"
+  ],
+  "normals": [
+    "/mnt/data/superdig_next_set/environment_normals/environment-regolith-tile-soft-soil_N.png",
+    "/mnt/data/superdig_next_set/environment_normals/environment-basalt-tile-hard-stone_N.png",
+    "/mnt/data/superdig_next_set/environment_normals/environment-lava-pool-surface-vein_N.png",
+    "/mnt/data/superdig_next_set/environment_normals/environment-void-space-dug-tunnel_N.png",
+    "/mnt/data/superdig_next_set/environment_normals/environment-bedrock-undiggable_N.png"
+  ]
+}

@@ -1,0 +1,3 @@
+[
+  { "levelId": 1, "oilQuota": 0, "rewardCR": 120, "perk": { "type": "sell_bonus_pct", "value": 5 } }
+]
