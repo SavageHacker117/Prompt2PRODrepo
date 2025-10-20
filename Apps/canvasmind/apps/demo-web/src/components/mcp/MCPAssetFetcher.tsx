@@ -7,9 +7,11 @@ export default function MCPAssetFetcher() {
   async function tryInject(kind: "texture"|"hdri"|"glb") {
     setStatus("Fetching…");
     try {
-      // Call your MCP endpoints if available; otherwise fallback to demo URLs.
       if (kind === "texture") {
         const texUrl = "https://threejs.org/examples/textures/uv_grid_opengl.jpg";
+
+        // Ensure the ball exists, then apply the map
+        (window as any).CanvasMindApp?.loadTestBall?.();
         await (window as any).__CM_INJECT?.applyTextureToTestBall?.({
           pbr_albedo: texUrl
         });

@@ -1,70 +1,16 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>CanvasMind • Prompt2PROD Demo</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="/src/styles.css" />
-</head>
-<body>
-  <div class="wrap">
-    <!-- Sidebar (sticky, scrolls independently) -->
-    <aside class="sidebar panel">
-      <h2>Prompt2PROD • Controls</h2>
+  <head>
+    <meta charset="utf-8" />
+    <title>CanvasMind • Prompt2PROD Demo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <!-- Single React root -->
+    <div id="root" style="width:100vw;height:100vh;"></div>
 
-      <!-- React control surface (has the two tabs) -->
-      <div id="react-ui"></div>
-
-      <!-- Rose (Character) -->
-      <div class="panel nested">
-        <h2>Rose (Character)</h2>
-        <div class="row mb6">
-          <input id="roseUrl" placeholder="/assets/rose.glb" />
-        </div>
-        <div class="row mb6">
-          <button id="btnLoadRose"   class="chip">Load Rose</button>
-          <button id="btnUnloadRose" class="chip">Unload</button>
-        </div>
-        <div class="row">
-          <button id="btnRoseWalk" class="chip">Walk</button>
-          <button id="btnRoseRun"  class="chip">Run</button>
-          <button id="btnRoseJump" class="chip">Jump</button>
-        </div>
-      </div>
-
-      <!-- Props -->
-      <div class="panel nested">
-        <h2>Props</h2>
-        <div class="row mb6">
-          <button id="btnLoadTestBall"   class="chip">Load TestBall</button>
-          <button id="btnUnloadTestBall" class="chip">Unload TestBall</button>
-        </div>
-        <div class="row">
-          <input id="importedBallUrl" placeholder="https://…/ball.glb" />
-          <button id="btnLoadImportedBall"   class="chip">Load Remote</button>
-          <button id="btnUnloadImportedBall" class="chip">Unload Remote</button>
-        </div>
-      </div>
-
-      <h3 class="mt12">Log</h3>
-      <div id="log"></div>
-    </aside>
-
-    <!-- Canvas column (never overlaps sidebar) -->
-    <main class="canvascol panel">
-      <!-- ThreeApplication mounts here; boot.ts creates the <canvas> inside -->
-      <div id="react-root" class="canvasmount"></div>
-    </main>
-  </div>
-
-  <!-- HUD -->
-  <div id="hud">
-    <div class="chip">FPS: <span id="fps">–</span></div>
-    <div class="chip">Draws (est): <span id="draws">–</span></div>
-    <div class="chip">Assets: <span id="assets">0</span></div>
-  </div>
-
-  <!-- React entry -->
-  <script type="module" src="/src/react/main.tsx"></script>
-</body>
+    <!-- React entry ONLY -->
+    <script type="module" src="/src/react/main.tsx"></script>
+  </body>
 </html>

@@ -28,17 +28,16 @@ export function loadTestBall(scene: THREE.Scene) {
   _ball = mesh;
 
   console.log("[TestBall] loaded as CM_TestBall");
-  return { node: mesh };
+  // Return the mesh directly (still compatible with older callers via node?:)
+  return mesh as unknown as { node: THREE.Mesh };
 }
 
 export function unloadTestBall(scene: THREE.Scene) {
   if (!_ball) return;
 
   try {
-    // Dispose geometry
     _ball.geometry?.dispose?.();
 
-    // Dispose any textures that might have been injected later
     const m: any = _ball.material;
     const texKeys = [
       "map", "normalMap", "roughnessMap", "metalnessMap",

@@ -1,15 +1,29 @@
 import React, { useEffect, useRef } from "react";
+import type { CanvasMindAPI } from "../boot";
 import { bootOnCanvas } from "../boot";
 
+declare global {
+  interface Window { CanvasMindApp?: CanvasMindAPI }
+}
+
 export default function CanvasPane() {
-  const ref = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!ref.current) return;
-    let api: any;
-    (async () => { api = await bootOnCanvas(ref.current); })();
-    return () => api?.dispose?.();
+    let api: CanvasMindAPI | undefined;
+    (async () => {
+      if (hostRef.current) api = await bootOnCanvas(hostRef.current);
+    })();
+
+    return () => {
+      try { api?.dispose(); } catch {}
+    };
   }, []);
 
-  return <div ref={ref} className="w-full h-full" />;
+  return (
+    <div
+      ref={hostRef}
+      style={{ width: "100%", height: "100%", background: "#071118" }}
+    />
+  );
 }

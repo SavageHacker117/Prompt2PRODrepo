@@ -1,7 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ThreeApplication } from "./ThreeApplication";
-import "../ui/main-ui";
+import App from "./App";
 
-const root = createRoot(document.getElementById("react-root")!);
-root.render(<ThreeApplication />);
+const el = document.getElementById("root")!;
+createRoot(el).render(<App />);

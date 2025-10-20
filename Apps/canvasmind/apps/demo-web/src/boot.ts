@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
@@ -7,20 +8,34 @@ import { initCanvasMind } from "./canvasmind/init";
 import { makeShadowCatcher } from "./three/shadow-catcher";
 import { sendTelemetry, scoreCandidates } from "./canvasmind/telemetry/client";
 
-// NEW: Rose + props controls
+// Rose + props + grass
 import { loadRose, unloadRose, playRoseAction, updateRose } from "./three/roseLoader";
 import { loadTestBall, unloadTestBall } from "./canvasmind/plugins/animator/testBall";
 import { loadImportedBall, unloadImportedBall } from "./canvasmind/plugins/animator/importedBall";
-// >>> NEW (grass)
 import { GrassField, GrassOpts } from "./canvasmind/plugins/grass/grassField";
+
+// NEW: Procedural terrain / road / car
+import { TerrainSystem } from "./canvasmind/plugins/terrain/terrain-system";
+import { RoadInfinite } from "./canvasmind/plugins/roads/road-infinite";
+import { loadCar } from "./canvasmind/plugins/vehicles/car-loader";
+import { CarController } from "./canvasmind/plugins/vehicles/car-controller";
+
+// ► MCP (real client)
+import { fetchRegistry, type MCPItem } from "./canvasmind/mcp/registry";
+import { callMCP } from "./canvasmind/mcp/http";
 
 const DEV = true;
 const vlog = (...a: any[]) => DEV && console.info("[CanvasMind]", ...a);
 
+// ─────────────────────────────────────────────────────────────
+// Selection layer: pick ONLY things that opt-in to this layer.
+const LAYER_SELECTABLE = 1;
+function markSelectableDeep(root: THREE.Object3D, on = true) {
+  root.traverse(o => on ? o.layers.enable(LAYER_SELECTABLE) : o.layers.disable(LAYER_SELECTABLE));
+}
+
 /* ─────────────────────────  Types  ───────────────────────── */
-type MCPRegistryItem = {
-  id: string; name: string; server_url: string; tags: string[]; capabilities: string[];
-};
+type MCPRegistryItem = MCPItem;
 type SkyboxOut = {
   asset: { kind: "texture.equirect" | "texture.cubemap"; urls: string[]; mime: string };
   provenance: { server: string; model: string; prompt?: string; seed?: number; ts: number };
@@ -110,6 +125,101 @@ class InstancingPool {
   }
 }
 
+/* ─────────────────────  Selection/Gizmo (optimized) ───────────────────── */
+class Selection {
+  private ray = new THREE.Raycaster();
+  private tmpBox = new THREE.Box3();
+  private outlineColor = 0x60a5fa;
+  public selected = new Set<THREE.Object3D>();
+  private helpers = new Map<THREE.Object3D, THREE.Box3Helper>();
+  private dirty = false;
+
+  constructor(
+    private scene: THREE.Scene,
+    private camera: THREE.Camera,
+    private canvas: HTMLCanvasElement
+  ) {}
+
+  pick(ev: PointerEvent, additive: boolean) {
+    if (ev.button !== 0) return; // only LMB
+    const rect = this.canvas.getBoundingClientRect();
+    const x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    this.ray.setFromCamera({ x, y }, this.camera as THREE.PerspectiveCamera);
+    this.ray.layers.set(LAYER_SELECTABLE);
+
+    const intersects = this.ray.intersectObjects(this.scene.children, true);
+    if (!intersects.length) { if (!additive) this.clear(); return; }
+
+    // find selectable root under scene
+    let top: THREE.Object3D = intersects[0].object;
+    while (top.parent && top.parent !== this.scene) top = top.parent;
+
+    if (!additive) this.clear();
+    if (this.selected.has(top)) { if (additive) this.unselect(top); }
+    else this.select(top);
+  }
+
+  select(o: THREE.Object3D) {
+    this.selected.add(o);
+    const box = new THREE.Box3().setFromObject(o);
+    const helper = new THREE.Box3Helper(box, this.outlineColor);
+    helper.renderOrder = 9999;
+    helper.layers.set(0); // helpers not pickable
+    this.scene.add(helper);
+    this.helpers.set(o, helper);
+    this.dirty = false;
+  }
+
+  unselect(o: THREE.Object3D) {
+    this.selected.delete(o);
+    const h = this.helpers.get(o);
+    if (h) { this.scene.remove(h); (h as any).geometry?.dispose?.(); (h as any).material?.dispose?.(); }
+    this.helpers.delete(o);
+    this.dirty = false;
+  }
+
+  clear() { [...this.selected].forEach(o => this.unselect(o)); }
+
+  markDirty() { this.dirty = true; }
+  refreshHelpers() {
+    if (!this.dirty) return;
+    for (const [obj, helper] of this.helpers) {
+      this.tmpBox.setFromObject(obj);
+      (helper as any).box.copy(this.tmpBox);
+    }
+    this.dirty = false;
+  }
+
+  deleteSelected() {
+    for (const obj of [...this.selected]) {
+      this.unselect(obj);
+      disposeObject3D(obj);
+    }
+  }
+
+  duplicateSelected(offset = new THREE.Vector3(0.25,0,0.25)) {
+    const clones: THREE.Object3D[] = [];
+    for (const obj of this.selected) {
+      const clone = obj.clone(true);
+      clone.traverse((n: any) => {
+        if (n.isMesh) {
+          n.material = n.material.clone?.() ?? n.material;
+          n.geometry = n.geometry.clone?.() ?? n.geometry;
+        }
+      });
+      const wp = new THREE.Vector3();
+      obj.getWorldPosition(wp).add(offset);
+      clone.position.copy(wp);
+      (obj.parent || this.scene).add(clone);
+      markSelectableDeep(clone, true);
+      clones.push(clone);
+    }
+    this.clear();
+    clones.forEach(c => this.select(c));
+  }
+}
+
 /* ─────────────────────  Public API type  ───────────────────── */
 export type CanvasMindAPI = {
   refreshRegistry(): Promise<void>;
@@ -120,7 +230,8 @@ export type CanvasMindAPI = {
   screenshot(): void;
   setGround(y: number, rx: number, rz: number): void;
   setQuality(mode: "performance" | "balanced" | "quality"): void;
-  // NEW
+
+  // Character/props
   loadRose(url?: string): Promise<any>;
   unloadRose(): void;
   playRoseAction(action: "walk" | "run" | "jump", loops?: number): void;
@@ -128,9 +239,26 @@ export type CanvasMindAPI = {
   unloadTestBall(): void;
   loadImportedBall(url: string): Promise<any>;
   unloadImportedBall(): void;
-  // >>> NEW (grass)
-  loadGrass(opts?: GrassOpts): Promise<{blades:number,size:number} | void>;
+
+  // Grass
+  loadGrass(opts?: GrassOpts & { quality?: "low"|"med"|"high" }): void;
   unloadGrass(): void;
+  updateGrass(opts: Partial<GrassOpts & { quality?: "low"|"med"|"high" }>): void;
+
+  // Editor/Gizmo/Selection
+  setGizmoMode(mode: "translate"|"rotate"|"scale"): void;
+  clearSelection(): void;
+  deleteSelection(): void;
+  duplicateSelection(): void;
+  flipSelectionXZ(): void;
+
+  // Skybox shaping
+  setBackgroundExposure(v: number): void;
+  setBackgroundBlur(v: number): void;
+
+  // NEW: Procedural controls (optional public)
+  startProcedural(): Promise<void>;
+  stopProcedural(): void;
 
   getState(): { assets: number; fps: number; draws: number; budget: ReturnType<BudgetManager["stats"]> };
   dispose(): void;
@@ -141,37 +269,83 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   // Canvas
   const canvas = document.createElement("canvas");
   canvas.style.width = "100%"; canvas.style.height = "100%";
+  canvas.oncontextmenu = e => e.preventDefault();
   rootDiv.appendChild(canvas);
 
   // Renderer
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio ?? 1, 1.75));
+  let pixelRatio = Math.min(window.devicePixelRatio ?? 1, 1.75);
+  renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMappingExposure = 1.0;
 
   // Scene
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0f18);
 
-  // >>> NEW (grass) handle
-  let grass: GrassField | null = null;
-
-  // Expose for injectors (PolyHaven/Qwen helpers)
+  // Expose for injectors
   (window as any).__CM_SCENE = scene;
   (window as any).__CM_RENDERER = renderer;
+
+  // ───────── Injectors (used by MCPAssetFetcher) ─────────
   (window as any).__CM_INJECT = {
-    async applyTextureToTestBall(maps: Record<string,string>) {
+    async applyTextureToTestBall(maps: Record<string, string>) {
       const s: THREE.Scene = (window as any).__CM_SCENE;
-      const ball = s.getObjectByName?.("CM_TestBall") as THREE.Mesh | null;
-      if (!ball || !ball.material) return;
-      const loader = new THREE.TextureLoader();
-      if (maps.pbr_albedo) {
-        const t = await loader.loadAsync(maps.pbr_albedo);
-        t.colorSpace = THREE.SRGBColorSpace;
-        (ball.material as any).map = t;
-        (ball.material as any).needsUpdate = true;
+      const r: THREE.WebGLRenderer = (window as any).__CM_RENDERER;
+
+      // Ensure a ball exists
+      let ball = s.getObjectByName("CM_TestBall") as THREE.Mesh | null;
+      if (!ball) {
+        const res = (window as any).CanvasMindApp?.loadTestBall?.();
+        if (res instanceof Promise) await res;
+        s.updateMatrixWorld(true);
+        ball = s.getObjectByName("CM_TestBall") as THREE.Mesh | null;
       }
+      if (!ball) return;
+
+      // Ensure PBR material
+      if (!(ball.material instanceof THREE.MeshStandardMaterial) &&
+          !(ball.material instanceof (THREE as any).MeshPhysicalMaterial)) {
+        const old: any = ball.material;
+        ball.material = new THREE.MeshStandardMaterial({
+          color: (old?.color?.isColor ? old.color : new THREE.Color(0xffffff)),
+          roughness: 0.5,
+          metalness: 0.0,
+          envMapIntensity: 1.0
+        });
+        old?.dispose?.();
+      }
+      const mat = ball.material as THREE.MeshStandardMaterial;
+
+      const loader = new THREE.TextureLoader();
+      const loadTex = async (url?: string, isColor = false) => {
+        if (!url) return undefined;
+        const t = await loader.loadAsync(url);
+        if (isColor) t.colorSpace = THREE.SRGBColorSpace;
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.anisotropy = Math.min(8, r.capabilities.getMaxAnisotropy?.() || 1);
+        return t;
+      };
+
+      const albedo = await loadTex(maps.pbr_albedo || maps.baseColor || maps.color, true);
+      const normal = await loadTex(maps.normal);
+      const rough  = await loadTex(maps.roughness);
+      const metal  = await loadTex(maps.metalness);
+      const ao     = await loadTex(maps.ao || maps.ambientOcclusion);
+
+      if (albedo) mat.map = albedo;
+      if (normal) mat.normalMap = normal;
+      if (rough)  mat.roughnessMap = rough;
+      if (metal)  mat.metalnessMap = metal;
+      if (ao)     mat.aoMap = ao;
+
+      mat.roughness = rough ? 1.0 : (mat.roughness ?? 0.5);
+      mat.metalness = metal ? 1.0 : (mat.metalness ?? 0.0);
+      mat.color.set(0xffffff);
+      mat.needsUpdate = true;
     },
+
     async loadHDRIEnvironment(url: string) {
       const r: THREE.WebGLRenderer = (window as any).__CM_RENDERER;
       const s: THREE.Scene = (window as any).__CM_SCENE;
@@ -181,47 +355,68 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       const pmrem = new THREE.PMREMGenerator(r);
       s.environment = pmrem.fromEquirectangular(tex).texture;
       s.background = tex;
+      (s as any).backgroundBlurriness = 0;
       pmrem.dispose();
     },
+
     async loadGLBModel(url: string) {
       const loader = new GLTFLoader();
       const gltf = await loader.loadAsync(url);
-      gltf.scene.traverse((o:any)=>{ if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+      gltf.scene.traverse((o:any)=>{ if (o.isMesh){ o.castShadow = o.receiveShadow = true; }});
       gltf.scene.name = "CM_RemoteModel";
       (window as any).__CM_SCENE.add(gltf.scene);
     },
+
     unloadGLBModel() {
       const s: THREE.Scene = (window as any).__CM_SCENE;
-      const node = s.getObjectByName("CM_RemoteModel");
-      if (!node) return;
-      node.traverse((o:any)=>{ if (o.isMesh) { o.geometry?.dispose?.(); (o.material as any)?.dispose?.(); }});
-      node.parent?.remove(node);
+      const n = s.getObjectByName("CM_RemoteModel");
+      if (!n) return;
+      n.traverse((o:any)=>{ if (o.isMesh){ o.geometry?.dispose?.(); (o.material as any)?.dispose?.(); }});
+      n.parent?.remove(n);
     }
   };
 
   // Camera + controls
-  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
   camera.position.set(5, 3, 7);
   const controls = new OrbitControls(camera, canvas);
-  controls.target.set(0, 1, 0); controls.update();
+  controls.target.set(0, 1, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.update();
 
   // Lights
   const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-  dirLight.position.set(5, 10, 6);
+  dirLight.position.set(5, 20, 10);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.set(2048, 2048);
+  dirLight.shadow.camera.near = 0.1;
+  dirLight.shadow.camera.far = 2000;
   scene.add(dirLight, new THREE.AmbientLight(0xffffff, 0.4));
 
   const grid = new THREE.GridHelper(20, 20, 0x334155, 0x1f2937);
+  (grid.material as THREE.Material).depthWrite = false;
+  grid.renderOrder = -2;
   scene.add(grid);
 
-  // Shadow catcher ground
+  // Shadow catcher ground (kept for “empty scene” mode)
   const shadowPlane = makeShadowCatcher(60, 0.35);
+  shadowPlane.name = "CM_ShadowCatcher";
   shadowPlane.position.y = 0;
+  shadowPlane.layers.disable(LAYER_SELECTABLE);
+  shadowPlane.renderOrder = -1;
   scene.add(shadowPlane);
 
   const rootGroup = new THREE.Group();
+  rootGroup.name = "CM_SpawnRoot";
   scene.add(rootGroup);
+
+  function adoptToRoot(node?: THREE.Object3D | null) {
+    if (!node) return;
+    if (node.parent) node.parent.remove(node);
+    rootGroup.add(node);
+    markSelectableDeep(node, true);
+  }
 
   // Resize
   function resize() {
@@ -236,24 +431,176 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   window.addEventListener("resize", resize);
   resize();
 
-  // DCWO registry (lightweight)
-  const DCWO_REG = new Map<string, DCWO>();
-  const register = (w: DCWO) => DCWO_REG.set(w.id, w);
-  const clearDCWOs = () => {
-    for (const w of DCWO_REG.values()) {
-      // @ts-expect-error
-      if (w.node?.dispose) (w.node as any).dispose();
-      // @ts-expect-error
-      if (w.node?.parent) (w.node as any).parent.remove(w.node);
+  // Selection + TransformControls
+  const selector = new Selection(scene, camera, canvas);
+  const gizmo = new TransformControls(camera, canvas);
+  gizmo.size = 0.9;
+  gizmo.addEventListener("dragging-changed", (e: any) => {
+    controls.enabled = !e.value;
+  });
+  // Perf lighten during drag
+  let restoreDrag: null | (()=>void) = null;
+  gizmo.addEventListener("dragging-changed", (e:any) => {
+    if (e.value) {
+      const prevShadow = dirLight.shadow.mapSize.clone();
+      const prevPR = pixelRatio;
+      dirLight.shadow.mapSize.set(1024,1024);
+      pixelRatio = Math.max(0.9, Math.min(pixelRatio, 1.25));
+      renderer.setPixelRatio(pixelRatio);
+      restoreDrag = () => { dirLight.shadow.mapSize.copy(prevShadow); pixelRatio = prevPR; renderer.setPixelRatio(pixelRatio); };
+    } else { restoreDrag?.(); restoreDrag = null; selector.markDirty(); }
+  });
+  gizmo.addEventListener("objectChange", () => selector.markDirty());
+  scene.add(gizmo);
+
+  function attachGizmoToLast() {
+    const last = [...selector.selected].at(-1);
+    if (last) gizmo.attach(last as THREE.Object3D);
+    else gizmo.detach();
+  }
+
+  // picking
+  canvas.addEventListener("pointerdown", (ev) => {
+    const additive = (ev.ctrlKey || ev.metaKey);
+    selector.pick(ev, additive);
+    attachGizmoToLast();
+  });
+
+  // keys for gizmo
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "w" || e.key === "W") gizmo.setMode("translate");
+    if (e.key === "e" || e.key === "E") gizmo.setMode("rotate");
+    if (e.key === "r" || e.key === "R") gizmo.setMode("scale");
+    if (e.key === "x" || e.key === "X") { selector.deleteSelected(); gizmo.detach(); }
+    if (e.key === "d" || e.key === "D") { selector.duplicateSelected(); attachGizmoToLast(); }
+    if (e.key === "f" || e.key === "F") {
+      for (const o of selector.selected) { o.scale.x *= -1; o.scale.z *= -1; }
+      selector.markDirty();
     }
-    DCWO_REG.clear();
+  });
+
+  // ───────────────────────────────
+  // Procedural terrain / road / car
+  // ───────────────────────────────
+  let terrain: TerrainSystem | null = null;
+  let road: RoadInfinite | null = null;
+  let car: THREE.Group | null = null;
+  let carCtl: CarController | null = null;
+
+  // panel-driven state
+  const procState = {
+    width: 7,
+    bank: 5,
+    curvature: 0.7,
+    segLen: 80,
+    heightAmp: 18,
+    seed: 7,
+    segCount: 18,
   };
+
+  const input = { throttle: 0, steer: 0 };
+  const driveKeys = new Set<string>();
+  function recomputeInput() {
+    input.throttle = driveKeys.has("ArrowUp") ? 1 : driveKeys.has("ArrowDown") ? -1 : 0;
+    input.steer    = driveKeys.has("ArrowLeft") ? -1 : driveKeys.has("ArrowRight") ? 1 : 0;
+  }
+  window.addEventListener("keydown", (e) => {
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) { e.preventDefault(); driveKeys.add(e.key); recomputeInput(); }
+  });
+  window.addEventListener("keyup", (e) => {
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) { e.preventDefault(); driveKeys.delete(e.key); recomputeInput(); }
+  });
+
+  async function rebuildRoad() {
+    if (!terrain) return;
+    // remove old
+    if (road?.group.parent) scene.remove(road.group);
+    road = new RoadInfinite({
+      seed: procState.seed,
+      segmentCount: procState.segCount,
+      segmentLen: procState.segLen,
+      curvature: procState.curvature,
+      width: procState.width,
+      bankAngleDeg: procState.bank,
+      terrain
+    });
+    await road.build();
+    scene.add(road.group);
+
+    if (car && terrain) {
+      carCtl = new CarController(car, { path: road.path, terrain });
+    }
+  }
+
+  async function startProcedural() {
+    // hide shadow catcher when terrain is up
+    shadowPlane.visible = false;
+    grid.visible = false;
+
+    // Terrain
+    terrain = new TerrainSystem({
+      tileSize: 220,
+      tileSegments: 120,
+      height: { amplitude: procState.heightAmp }
+    });
+    terrain.group.name = "CM_Terrain";
+    scene.add(terrain.group);
+    // don't allow selecting terrain tiles by default
+    markSelectableDeep(terrain.group, false);
+
+    // Road
+    await rebuildRoad();
+
+    // Car (simple robust load with correct absolute path + selection)
+    try {
+      car = await loadCar("/assets/Car.glb"); // absolute + correct case
+      adoptToRoot(car);                       // make selectable and under CM_SpawnRoot
+      carCtl = new CarController(car, { path: (road as any).path, terrain });
+    } catch (err) {
+      console.warn("Car model not found:", err);
+      // Keep the demo running without a car
+    }
+
+    // event hooks from UI panel
+    window.addEventListener("proc.set", (e: any) => {
+      const p = e.detail || {};
+      let needsRoad = false;
+      if (typeof p.roadWidth === "number") { procState.width = p.roadWidth; needsRoad = true; }
+      if (typeof p.bank === "number")      { procState.bank = p.bank; needsRoad = true; }
+      if (typeof p.curvature === "number") { procState.curvature = p.curvature; needsRoad = true; }
+      if (typeof p.segLen === "number")    { procState.segLen = p.segLen; needsRoad = true; }
+      if (typeof p.heightScale === "number") { procState.heightAmp = p.heightScale; terrain?.setHeightParams({ amplitude: procState.heightAmp }); }
+      if (needsRoad) { void rebuildRoad(); }
+    });
+    window.addEventListener("proc.regen", () => {
+      procState.seed = (Math.random() * 65536) | 0;
+      void rebuildRoad();
+    });
+  }
+
+  function stopProcedural() {
+    grid.visible = true;
+    shadowPlane.visible = true;
+    if (car) { disposeObject3D(car); car = null; }
+    if (road) { if (road.group.parent) scene.remove(road.group); road.group.traverse((o:any)=>{ if(o.isMesh){ o.geometry?.dispose?.(); (o.material as any)?.dispose?.(); }}); road = null; }
+    if (terrain) {
+      if (terrain.group.parent) scene.remove(terrain.group);
+      terrain.group.traverse((o:any)=>{ if(o.isMesh){ o.geometry?.dispose?.(); (o.material as any)?.dispose?.(); }});
+      terrain = null;
+    }
+    carCtl = null;
+  }
+
+  // Auto-start the procedural demo on boot:
+  await startProcedural();
 
   // Telemetry/FPS
   let frames = 0, lastFpsTick = performance.now();
   let fps = 0, draws = 0;
   let lastRenderNow = performance.now();
   let animId = 0;
+  const TARGET_FPS = 55;
+
   const animate = (now: number) => {
     animId = requestAnimationFrame(animate);
 
@@ -261,8 +608,9 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     lastRenderNow = now;
 
     updateRose(deltaSec);
-    // >>> NEW (grass)
     if (grass) grass.update(deltaSec);
+    if (carCtl) carCtl.update(deltaSec, input);
+    if (road && car) road.tick(car.position.x, car.position.z);
 
     frames++;
     if (now - lastFpsTick >= 1000) {
@@ -271,14 +619,24 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       const b = budgets.stats();
       const crowded = b.nodes > b.caps.nodes * 0.9 || b.mb > b.caps.texMemMB * 0.9;
       dirLight.shadow.mapSize.set(crowded ? 1024 : 2048, crowded ? 1024 : 2048);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio ?? 1, crowded ? 1.25 : 1.75));
+
+      // adaptive PR
+      if (!restoreDrag) {
+        if (fps < TARGET_FPS - 5) pixelRatio = Math.max(0.9, pixelRatio - 0.1);
+        if (fps > TARGET_FPS + 5) pixelRatio = Math.min(1.75, pixelRatio + 0.05);
+        renderer.setPixelRatio(pixelRatio);
+      }
     }
+    selector.refreshHelpers();
+    controls.update();
     renderer.render(scene, camera);
   };
   animId = requestAnimationFrame(animate);
 
+  // Flush render lists occasionally (micro GC)
   const renderListTimer = setInterval(() => (renderer as any).renderLists?.dispose?.(), 5_000);
 
+  // Context loss guard
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); console.warn("WebGL context lost"); });
   canvas.addEventListener("webglcontextrestored", () => { location.reload(); });
 
@@ -288,31 +646,15 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   // Instancing pool
   const instPool = new InstancingPool();
 
-  // MCP mocks
-  const MCP_REGISTRY: MCPRegistryItem[] = [
-    { id: "nebula-skybox", name: "Nebula Skybox Generator (mock)", server_url: "/mcp/nebula", tags: ["skybox","texture"], capabilities: ["generate_skybox"] },
-    { id: "mesh-boulder",  name: "Basalt Boulder Mesh (mock)",    server_url: "/mcp/mesh",   tags: ["mesh","glb"],    capabilities: ["generate_mesh"] }
-  ];
-  async function fetchRegistry(): Promise<MCPRegistryItem[]> { return MCP_REGISTRY; }
-
-  async function callMCP<TOut>(serverUrl: string, endpoint: string, body: Record<string, unknown>): Promise<TOut> {
-    if (serverUrl.endsWith("/nebula") && endpoint === "generate_skybox") {
-      const url = "https://threejs.org/examples/textures/2294472375_24a3b8ef46_o.jpg";
-      return {
-        asset: { kind: "texture.equirect", urls: [url], mime: "image/jpeg" },
-        provenance: { server: serverUrl, model: "nebula-mock-v1", prompt: body?.["prompt"] as string, seed: (body?.["seed"] as number) ?? 42, ts: Date.now() },
-        budget_hint: { tex_mem_mb_est: 32 }
-      } as unknown as TOut;
+  // ►► MCP helpers
+  async function getPreferredServer(tag: "skybox" | "mesh"): Promise<MCPRegistryItem | null> {
+    const items = await fetchRegistry();
+    const sel = document.getElementById("serverSelect") as HTMLSelectElement | null;
+    if (sel && sel.value) {
+      const chosen = items.find(i => i.id === sel.value);
+      if (chosen && chosen.tags.includes(tag)) return chosen;
     }
-    if (serverUrl.endsWith("/mesh") && endpoint === "generate_mesh") {
-      const url = "https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf";
-      return {
-        asset: { kind: "model.gltf", url },
-        provenance: { server: serverUrl, model: "mesh-mock-v1", prompt: body?.["prompt"] as string, seed: (body?.["seed"] as number) ?? 1337, ts: Date.now() },
-        budget_hint: { tris_est: 20000 }
-      } as unknown as TOut;
-    }
-    throw new Error(`Unknown MCP endpoint ${serverUrl}/${endpoint}`);
+    return items.find(i => i.tags.includes(tag)) || null;
   }
 
   /* ───────────────  Actions  ─────────────── */
@@ -321,7 +663,12 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     const sel = document.getElementById("serverSelect") as HTMLSelectElement | null;
     if (sel) {
       sel.innerHTML = "";
-      items.forEach((i) => { const opt = document.createElement("option"); opt.value = i.id; opt.textContent = `${i.name} (${i.tags.join(",")})`; sel.appendChild(opt); });
+      items.forEach((i) => {
+        const opt = document.createElement("option");
+        opt.value = i.id;
+        opt.textContent = `${i.name} (${i.tags.join(",")})`;
+        sel.appendChild(opt);
+      });
     }
     log(`Registry loaded: ${items.length} servers`);
   }
@@ -329,21 +676,26 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   // keep the last env to dispose properly
   let lastEnvTex: THREE.Texture | null = null;
   async function applySkybox(promptText: string) {
-    const server = (await fetchRegistry()).find((r) => r.tags.includes("skybox"));
-    if (!server) throw new Error("No skybox server found");
+    const server = await getPreferredServer("skybox");
+    if (!server) throw new Error("No skybox-capable server found");
     log(`Calling MCP ${server.id}/generate_skybox …`);
 
-    const out = await callMCP<SkyboxOut>(server.server_url, "generate_skybox", { prompt: promptText, seed: 42, format: "equirect" });
+    const out = await callMCP<SkyboxOut>(server.server_url, "generate_skybox", {
+      prompt: promptText, seed: 42, format: "equirect"
+    });
 
     const tex = await new THREE.TextureLoader().loadAsync(out.asset.urls[0]);
     tex.mapping = THREE.EquirectangularReflectionMapping;
     tex.colorSpace = THREE.SRGBColorSpace;
-    scene.background = tex;
+    scene.background = tex as any;
 
+    // Dispose previous env
     if (lastEnvTex) try { lastEnvTex.dispose(); } catch {}
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envMap = pmrem.fromEquirectangular(tex).texture;
     scene.environment = envMap;
+    (scene as any).backgroundIntensity = 1.0;
+    (scene as any).backgroundBlurriness = 0.0;
     pmrem.dispose();
     lastEnvTex = tex;
 
@@ -364,6 +716,7 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
 
     log(`Skybox applied • model=${out.provenance.model} seed=${out.provenance.seed}`);
 
+    // Telemetry
     void sendTelemetry("http://localhost:8088", {
       prompt: String(out.provenance.prompt ?? promptText),
       candidate: { type: "skybox", model: out.provenance.model, seed: out.provenance.seed },
@@ -378,6 +731,7 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   gltfLoader.setDRACOLoader(draco);
   gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
+  // Deterministic scoring fallback
   function heuristicScore(c: any): number {
     const tris = c?.budget_hint?.tris_est ?? 20000;
     const trisScore = Math.max(0, 1 - tris / 300_000);
@@ -391,8 +745,8 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     const s = budgets.stats();
     if (s.nodes >= s.caps.nodes) { log("Spawn refused (node cap reached)."); return; }
 
-    const server = (await fetchRegistry()).find((r) => r.tags.includes("mesh"));
-    if (!server) throw new Error("No mesh server found");
+    const server = await getPreferredServer("mesh");
+    if (!server) throw new Error("No mesh-capable server found");
     log(`Calling MCP ${server.id}/generate_mesh …`);
 
     const K = 3;
@@ -424,6 +778,7 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
 
     const gltf = await gltfLoader.loadAsync(chosen.asset.url);
 
+    // Try instancing
     let usedInstancing = false;
     gltf.scene.updateMatrixWorld(true);
     const firstMesh = gltf.scene.getObjectByProperty("type", "Mesh") as THREE.Mesh | null;
@@ -432,7 +787,9 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       const trisEst = chosen.budget_hint?.tris_est ?? 20000;
       const entry = instPool.getOrCreate(chosen.asset.url, firstMesh, trisEst, 2000);
       if (!entry.inst.parent) {
+        entry.inst.name = "CM_InstancedPool";
         rootGroup.add(entry.inst);
+        markSelectableDeep(entry.inst, true);
         budgets.track({
           id: `instPool_${chosen.asset.url}`,
           kind: "instanced",
@@ -450,11 +807,13 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       if (instPool.addInstance(entry, m)) { usedInstancing = true; log(`Instanced spawn (policy score=${best.toFixed(3)})`); }
     }
 
+    // Fallback: normal object with LOD
     if (!usedInstancing) {
       const node = makeBasicLOD(gltf.scene);
+      node.name = "CM_Mesh";
       node.position.set((Math.random() * 4 - 2), 0, (Math.random() * 4 - 2));
       node.traverse((o: any) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
-      rootGroup.add(node);
+      adoptToRoot(node);
 
       const estTris = chosen.budget_hint?.tris_est ?? 20000;
       const estMB = Math.max(8, Math.round(estTris / 2000));
@@ -496,24 +855,61 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     });
   }
 
-  function clearScene() {
-    // >>> NEW (grass) ensure grass is removed
-    if (grass) {
-      budgets.untrackByNode(grass.group);
-      grass.removeFrom(scene);
-      grass = null;
-    }
+  // Grass (with quality)
+  let grass: GrassField | null = null;
+  let lastGrassOpts: (GrassOpts & { quality?: "low"|"med"|"high" }) | null = null;
 
+  function buildGrass(opts: GrassOpts & { quality?: "low"|"med"|"high" }) {
+    lastGrassOpts = { ...opts };
+    if (grass) { grass.removeFrom(scene); grass = null; }
+    grass = new GrassField(opts);
+    grass.addTo(scene);
+    grass.group.position.set(0, 0, 0);
+    markSelectableDeep(grass.group, true);
+  }
+
+  function loadGrass(opts: GrassOpts & { quality?: "low"|"med"|"high" } = {}) { buildGrass(opts); }
+  function unloadGrass() { if (!grass) return; grass.removeFrom(scene); grass = null; }
+  function updateGrass(opts: Partial<GrassOpts & { quality?: "low"|"med"|"high" }>) {
+    if (!grass) { buildGrass({ ...(opts as any) }); return; }
+    // if quality changed, rebuild; else live-update uniforms
+    if (opts.quality !== undefined && lastGrassOpts?.quality !== opts.quality) {
+      buildGrass({ ...lastGrassOpts!, ...opts });
+      return;
+    }
+    if (typeof opts.bladeHeight === "number") grass.setHeight(opts.bladeHeight);
+    if (typeof opts.windStrength === "number" || typeof opts.windSpeed === "number") {
+      grass.setWind(
+        opts.windStrength ?? (lastGrassOpts?.windStrength ?? 0.6),
+        opts.windSpeed   ?? (lastGrassOpts?.windSpeed ?? 1.1)
+      );
+    }
+    lastGrassOpts = { ...lastGrassOpts!, ...opts };
+  }
+
+  function clearScene() {
+    // env/background
     const bg: any = scene.background;
     if (bg?.dispose) try { bg.dispose(); } catch {}
     scene.background = new THREE.Color(0x0a0f18);
     scene.environment = null;
-    if (lastEnvTex) { try { lastEnvTex.dispose(); } catch {} lastEnvTex = null; }
+    (scene as any).backgroundBlurriness = 0;
 
+    // instancing
     instPool.disposeAll(scene);
 
+    // meshes
     while (rootGroup.children.length) disposeObject3D(rootGroup.children[0]);
 
+    // procedural
+    stopProcedural();
+
+    // grass
+    if (grass) { grass.removeFrom(scene); grass = null; }
+
+    selector.clear(); gizmo.detach();
+
+    // registry + budgets
     clearDCWOs();
     budgets.clearAll();
     budgets = new BudgetManager(budgets.caps);
@@ -526,20 +922,24 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     shadowPlane.position.y = y;
     shadowPlane.rotation.x = -Math.PI / 2 + rx;
     shadowPlane.rotation.z = rz;
+    if (grass) grass.group.position.y = y + 0.001; // prevent z-fight with catcher
   }
 
   function setQuality(mode: "performance" | "balanced" | "quality") {
     if (mode === "performance") {
       budgets.caps = { texMemMB: 256, tris: 800_000, nodes: 80 };
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio ?? 1, 1.25));
+      pixelRatio = Math.min(window.devicePixelRatio ?? 1, 1.25);
+      renderer.setPixelRatio(pixelRatio);
       dirLight.shadow.mapSize.set(1024, 1024);
     } else if (mode === "balanced") {
       budgets.caps = { texMemMB: 512, tris: 1_500_000, nodes: 120 };
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio ?? 1, 1.5));
+      pixelRatio = Math.min(window.devicePixelRatio ?? 1, 1.5);
+      renderer.setPixelRatio(pixelRatio);
       dirLight.shadow.mapSize.set(2048, 2048);
     } else {
       budgets.caps = { texMemMB: 1024, tris: 3_000_000, nodes: 200 };
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio ?? 1, 2));
+      pixelRatio = Math.min(window.devicePixelRatio ?? 1, 2);
+      renderer.setPixelRatio(pixelRatio);
       dirLight.shadow.mapSize.set(4096, 4096);
     }
   }
@@ -550,20 +950,24 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     a.href = data; a.download = `canvasmind_${Date.now()}.png`; a.click();
   }
 
-  function getState() {
-    return { assets: DCWO_REG.size, fps, draws, budget: budgets.stats() };
-  }
+  function setBackgroundExposure(v: number) { renderer.toneMappingExposure = Math.max(0.01, v); }
+  function setBackgroundBlur(v: number) { (scene as any).backgroundBlurriness = Math.max(0, Math.min(1, v)); }
 
-  bindOptionalHtmlUi({
-    applySkybox, spawnMesh, batchSpawn, clearScene, screenshot, refreshRegistry
-  });
+  function getState() { return { assets: DCWO_REG.size, fps, draws, budget: budgets.stats() }; }
 
+  // DCWO registry (lightweight)
+  const DCWO_REG = new Map<string, DCWO>();
+  const register = (w: DCWO) => DCWO_REG.set(w.id, w);
+  const clearDCWOs = () => { DCWO_REG.clear(); };
+
+  // init CanvasMind core
   await initCanvasMind({
     scene, renderer,
     features: { worldField: false },
     budgets: { texMemSoftCapMB: budgets.caps.texMemMB, trisSoftCap: budgets.caps.tris }
   });
 
+  // HUD
   const fpsEl = document.getElementById("fps");
   const drawsEl = document.getElementById("draws");
   const assetsEl = document.getElementById("assets");
@@ -590,34 +994,38 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     setGround,
     setQuality,
 
-    async loadRose(url: string = "/assets/rose.glb") { return loadRose(scene, url); },
+    // character & props — adopt to root + selectable
+    async loadRose(url: string = "/assets/rose.glb") { const n = await loadRose(scene, url); adoptToRoot(n as any); return n; },
     unloadRose() { return unloadRose(scene); },
     playRoseAction(action: "walk" | "run" | "jump", loops = 2) { return playRoseAction(action, loops); },
-    loadTestBall() { loadTestBall(scene); },
+
+    // FIX: adopt the actual mesh (not wrapper object)
+    loadTestBall() {
+      const res = loadTestBall(scene) as { node: THREE.Object3D } | any;
+      const node = res?.node ?? res;
+      adoptToRoot(node);
+    },
     unloadTestBall() { unloadTestBall(scene); },
-    async loadImportedBall(url: string) { return loadImportedBall(scene, url); },
+
+    async loadImportedBall(url: string) { const n = await loadImportedBall(scene, url); adoptToRoot(n as any); return n; },
     unloadImportedBall() { unloadImportedBall(scene); },
 
-    // >>> NEW (grass)
-    async loadGrass(opts: GrassOpts = {}) {
-      if (grass) return grass.stats();
-      grass = new GrassField({ size: 12, density: 700, windStrength: 0.6, windSpeed: 1.1, ...opts });
-      grass.addTo(scene);
-      budgets.track({
-        id: "grass_field",
-        kind: "instanced",
-        estMB: Math.min(64, Math.floor((grass.stats().blades * 5) / 4096)),
-        node: grass.group,
-        dispose: () => { grass?.removeFrom(scene); }
-      });
-      return grass.stats();
-    },
-    unloadGrass() {
-      if (!grass) return;
-      grass.removeFrom(scene);
-      budgets.untrackByNode(grass.group);
-      grass = null;
-    },
+    // grass
+    loadGrass, unloadGrass, updateGrass,
+
+    // editor/gizmo
+    setGizmoMode(mode) { gizmo.setMode(mode); },
+    clearSelection() { selector.clear(); gizmo.detach(); },
+    deleteSelection() { selector.deleteSelected(); gizmo.detach(); },
+    duplicateSelection() { selector.duplicateSelected(); attachGizmoToLast(); },
+    flipSelectionXZ() { for (const o of selector.selected) { o.scale.x *= -1; o.scale.z *= -1; } selector.markDirty(); },
+
+    // skybox shaping
+    setBackgroundExposure, setBackgroundBlur,
+
+    // procedural
+    async startProcedural() { await startProcedural(); },
+    stopProcedural() { stopProcedural(); },
 
     getState,
     dispose() {
@@ -632,69 +1040,9 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     }
   };
   (window as any).CanvasMindApp = api;
+
+  // enable picking on spawn root
+  markSelectableDeep(rootGroup, true);
+
   return api;
-}
-
-/* ───────────  Optional: keep native HTML buttons working  ─────────── */
-function bindOptionalHtmlUi(api: {
-  applySkybox(prompt: string): Promise<void>;
-  spawnMesh(): Promise<void>;
-  batchSpawn(count: number): Promise<void>;
-  clearScene(): void;
-  screenshot(): void;
-  refreshRegistry(): Promise<void>;
-}) {
-  const $ = (id: string) => document.getElementById(id);
-  $("btnSkybox")?.addEventListener("click", () => {
-    const prompt = (document.getElementById("prompt") as HTMLInputElement | null)?.value?.trim() || "aurora nebula";
-    api.applySkybox(prompt);
-  });
-  $("btnMesh")?.addEventListener("click", () => api.spawnMesh());
-  $("btnClear")?.addEventListener("click", () => api.clearScene());
-  $("btnShot")?.addEventListener("click", () => api.screenshot());
-  $("btnRefresh")?.addEventListener("click", () => api.refreshRegistry());
-
-  const gY  = $("groundY")  as HTMLInputElement | null;
-  const gRX = $("groundRX") as HTMLInputElement | null;
-  const gRZ = $("groundRZ") as HTMLInputElement | null;
-  [gY, gRX, gRZ].forEach((el) => el?.addEventListener("input", () => {
-    const y  = parseFloat(gY?.value ?? "0");
-    const rx = parseFloat(gRX?.value ?? "0");
-    const rz = parseFloat(gRZ?.value ?? "0");
-    (window as any).CanvasMindApp?.setGround(y, rx, rz);
-  }));
-
-  $("btnLoadRose")?.addEventListener("click", () => {
-    const url = (document.getElementById("roseUrl") as HTMLInputElement | null)?.value?.trim() || "/assets/rose.glb";
-    (window as any).CanvasMindApp?.loadRose?.(url);
-  });
-  $("btnUnloadRose")?.addEventListener("click", () => {
-    (window as any).CanvasMindApp?.unloadRose?.();
-  });
-  $("btnRoseWalk")?.addEventListener("click", () => {
-    (window as any).CanvasMindApp?.playRoseAction?.("walk", 2);
-  });
-  $("btnRoseRun")?.addEventListener("click", () => {
-    (window as any).CanvasMindApp?.playRoseAction?.("run", 2);
-  });
-  $("btnRoseJump")?.addEventListener("click", () => {
-    (window as any).CanvasMindApp?.playRoseAction?.("jump", 1);
-  });
-
-  $("btnLoadTestBall")?.addEventListener("click", () => {
-    (window as any).CanvasMindApp?.loadTestBall?.();
-  });
-  $("btnUnloadTestBall")?.addEventListener("click", () => {
-    (window as any).CanvasMindApp?.unloadTestBall?.();
-  });
-
-  $("btnLoadImportedBall")?.addEventListener("click", () => {
-    const url = (document.getElementById("importedBallUrl") as HTMLInputElement | null)?.value?.trim();
-    if (url) (window as any).CanvasMindApp?.loadImportedBall?.(url);
-  });
-  $("btnUnloadImportedBall")?.addEventListener("click", () => {
-    (window as any).CanvasMindApp?.unloadImportedBall?.();
-  });
-
-  // (Optional) Add plain HTML buttons with ids btnLoadGrass / btnUnloadGrass if desired.
 }
