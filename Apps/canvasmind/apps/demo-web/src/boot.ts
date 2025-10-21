@@ -14,7 +14,7 @@ import { loadTestBall, unloadTestBall } from "./canvasmind/plugins/animator/test
 import { loadImportedBall, unloadImportedBall } from "./canvasmind/plugins/animator/importedBall";
 import { GrassField, GrassOpts } from "./canvasmind/plugins/grass/grassField";
 
-// NEW: Procedural terrain / road / car
+// Procedural terrain / road / car
 import { TerrainSystem } from "./canvasmind/plugins/terrain/terrain-system";
 import { RoadInfinite } from "./canvasmind/plugins/roads/road-infinite";
 import { loadCar } from "./canvasmind/plugins/vehicles/car-loader";
@@ -23,6 +23,11 @@ import { CarController } from "./canvasmind/plugins/vehicles/car-controller";
 // ► MCP (real client)
 import { fetchRegistry, type MCPItem } from "./canvasmind/mcp/registry";
 import { callMCP } from "./canvasmind/mcp/http";
+
+// ► Splats
+import { makeDiscSplat, SplatCloud } from "./canvasmind/plugins/splats/splat-cloud";
+import { parseAsciiPLY } from "./canvasmind/plugins/splats/ply-parse";
+import { imageFileToSplatCloud, videoFileToSplatCloud, type ImageSplatOpts } from "./canvasmind/plugins/splats/image-to-splats";
 
 const DEV = true;
 const vlog = (...a: any[]) => DEV && console.info("[CanvasMind]", ...a);
@@ -84,7 +89,7 @@ function disposeMaterial(mat: any) {
   try { mat.dispose?.(); } catch {}
 }
 function disposeObject3D(node: THREE.Object3D) {
-  node.traverse((o: any) => { if (o.isMesh) { try { o.geometry?.dispose?.(); } catch {} disposeMaterial(o.material); } });
+  node.traverse((o: any) => { if (o.isMesh || o.isPoints) { try { o.geometry?.dispose?.(); } catch {} disposeMaterial(o.material); } });
   node.parent?.remove(node);
 }
 
@@ -256,9 +261,15 @@ export type CanvasMindAPI = {
   setBackgroundExposure(v: number): void;
   setBackgroundBlur(v: number): void;
 
-  // NEW: Procedural controls (optional public)
+  // Procedural controls
   startProcedural(): Promise<void>;
   stopProcedural(): void;
+
+  // Splats
+  spawnSplatDemo(count?: number, radius?: number): void;
+  loadSplatPLY(url: string): Promise<void>;
+  loadSplatFromFile(file: File, opts?: ImageSplatOpts): Promise<void>;
+  clearSplats(): void;
 
   getState(): { assets: number; fps: number; draws: number; budget: ReturnType<BudgetManager["stats"]> };
   dispose(): void;
@@ -487,15 +498,8 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   let car: THREE.Group | null = null;
   let carCtl: CarController | null = null;
 
-  // panel-driven state
   const procState = {
-    width: 7,
-    bank: 5,
-    curvature: 0.7,
-    segLen: 80,
-    heightAmp: 18,
-    seed: 7,
-    segCount: 18,
+    width: 7, bank: 5, curvature: 0.7, segLen: 80, heightAmp: 18, seed: 7, segCount: 18,
   };
 
   const input = { throttle: 0, steer: 0 };
@@ -513,7 +517,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
 
   async function rebuildRoad() {
     if (!terrain) return;
-    // remove old
     if (road?.group.parent) scene.remove(road.group);
     road = new RoadInfinite({
       seed: procState.seed,
@@ -533,11 +536,9 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   }
 
   async function startProcedural() {
-    // hide shadow catcher when terrain is up
     shadowPlane.visible = false;
     grid.visible = false;
 
-    // Terrain
     terrain = new TerrainSystem({
       tileSize: 220,
       tileSegments: 120,
@@ -545,23 +546,18 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     });
     terrain.group.name = "CM_Terrain";
     scene.add(terrain.group);
-    // don't allow selecting terrain tiles by default
     markSelectableDeep(terrain.group, false);
 
-    // Road
     await rebuildRoad();
 
-    // Car (simple robust load with correct absolute path + selection)
     try {
-      car = await loadCar("/assets/Car.glb"); // absolute + correct case
-      adoptToRoot(car);                       // make selectable and under CM_SpawnRoot
+      car = await loadCar("/assets/Car.glb");
+      adoptToRoot(car);
       carCtl = new CarController(car, { path: (road as any).path, terrain });
     } catch (err) {
       console.warn("Car model not found:", err);
-      // Keep the demo running without a car
     }
 
-    // event hooks from UI panel
     window.addEventListener("proc.set", (e: any) => {
       const p = e.detail || {};
       let needsRoad = false;
@@ -591,7 +587,7 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     carCtl = null;
   }
 
-  // Auto-start the procedural demo on boot:
+  // Auto-start procedural demo
   await startProcedural();
 
   // Telemetry/FPS
@@ -603,7 +599,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
 
   const animate = (now: number) => {
     animId = requestAnimationFrame(animate);
-
     const deltaSec = (now - lastRenderNow) / 1000;
     lastRenderNow = now;
 
@@ -620,7 +615,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       const crowded = b.nodes > b.caps.nodes * 0.9 || b.mb > b.caps.texMemMB * 0.9;
       dirLight.shadow.mapSize.set(crowded ? 1024 : 2048, crowded ? 1024 : 2048);
 
-      // adaptive PR
       if (!restoreDrag) {
         if (fps < TARGET_FPS - 5) pixelRatio = Math.max(0.9, pixelRatio - 0.1);
         if (fps > TARGET_FPS + 5) pixelRatio = Math.min(1.75, pixelRatio + 0.05);
@@ -689,7 +683,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     tex.colorSpace = THREE.SRGBColorSpace;
     scene.background = tex as any;
 
-    // Dispose previous env
     if (lastEnvTex) try { lastEnvTex.dispose(); } catch {}
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envMap = pmrem.fromEquirectangular(tex).texture;
@@ -716,7 +709,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
 
     log(`Skybox applied • model=${out.provenance.model} seed=${out.provenance.seed}`);
 
-    // Telemetry
     void sendTelemetry("http://localhost:8088", {
       prompt: String(out.provenance.prompt ?? promptText),
       candidate: { type: "skybox", model: out.provenance.model, seed: out.provenance.seed },
@@ -731,7 +723,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   gltfLoader.setDRACOLoader(draco);
   gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
-  // Deterministic scoring fallback
   function heuristicScore(c: any): number {
     const tris = c?.budget_hint?.tris_est ?? 20000;
     const trisScore = Math.max(0, 1 - tris / 300_000);
@@ -807,7 +798,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
       if (instPool.addInstance(entry, m)) { usedInstancing = true; log(`Instanced spawn (policy score=${best.toFixed(3)})`); }
     }
 
-    // Fallback: normal object with LOD
     if (!usedInstancing) {
       const node = makeBasicLOD(gltf.scene);
       node.name = "CM_Mesh";
@@ -872,7 +862,6 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
   function unloadGrass() { if (!grass) return; grass.removeFrom(scene); grass = null; }
   function updateGrass(opts: Partial<GrassOpts & { quality?: "low"|"med"|"high" }>) {
     if (!grass) { buildGrass({ ...(opts as any) }); return; }
-    // if quality changed, rebuild; else live-update uniforms
     if (opts.quality !== undefined && lastGrassOpts?.quality !== opts.quality) {
       buildGrass({ ...lastGrassOpts!, ...opts });
       return;
@@ -887,6 +876,109 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     lastGrassOpts = { ...lastGrassOpts!, ...opts };
   }
 
+  // ───────────────────────────────
+  // Splats (Gaussian-splat scaffold)
+  // ───────────────────────────────
+  const splatRoot = new THREE.Group();
+  splatRoot.name = "CM_Splats";
+  scene.add(splatRoot);
+
+  function trackPoints(points: THREE.Points, id: string, extraBytes = 0) {
+    const posBytes = (points.geometry.getAttribute("position")?.array?.byteLength ?? 0);
+    const colorBytes = (points.geometry.getAttribute("color")?.array?.byteLength ?? 0);
+    budgets.track({
+      id,
+      kind: "mesh",
+      estMB: Math.max(4, Math.ceil((posBytes + colorBytes + extraBytes) / 1_000_000)),
+      node: points,
+      dispose: () => disposeObject3D(points)
+    });
+  }
+
+  function spawnSplatDemo(count = 20000, radius = 2) {
+    const cloud = makeDiscSplat(count, radius);
+    cloud.name = `CM_SplatDemo_${Date.now()}`;
+    markSelectableDeep(cloud, true);
+    splatRoot.add(cloud);
+    trackPoints(cloud, cloud.name);
+  }
+
+  async function loadSplatPLY(url: string) {
+    const text = await (await fetch(url)).text();
+    const { positions, colors } = parseAsciiPLY(text);
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    let hasColors = false;
+    if (colors && colors.length) {
+      const stride = (colors.length % 3 === 0) ? 3 : 4;
+      const f = new Float32Array((colors.length / stride) * 4);
+      for (let i = 0, j = 0; i < colors.length; i += stride, j += 4) {
+        f[j+0] = colors[i+0] / 255;
+        f[j+1] = colors[i+1] / 255;
+        f[j+2] = colors[i+2] / 255;
+        f[j+3] = (stride === 4 ? colors[i+3] : 255) / 255;
+      }
+      g.setAttribute("color", new THREE.BufferAttribute(f, 4));
+      hasColors = true;
+    }
+
+    const m = new THREE.PointsMaterial({
+      size: 0.02, sizeAttenuation: true, transparent: true, depthWrite: false,
+      vertexColors: hasColors
+    });
+    const pts = new THREE.Points(g, m);
+    pts.name = `CM_SplatPLY_${Date.now()}`;
+
+    markSelectableDeep(pts, true);
+    splatRoot.add(pts);
+    trackPoints(pts, pts.name);
+    vlog("PLY splat loaded:", url, pts);
+  }
+
+  async function loadSplatFromFile(file: File, opts: ImageSplatOpts = {}) {
+    const lower = file.name.toLowerCase();
+    let splat: SplatCloud | null = null;
+
+    if (/\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(lower)) {
+      splat = await imageFileToSplatCloud(file, { step: 2, worldWidth: 2, size: 0.02, ...opts });
+    } else if (/\.(mp4|webm|mov)$/i.test(lower)) {
+      splat = await videoFileToSplatCloud(file, { step: 2, worldWidth: 2, size: 0.02, ...opts });
+    } else if (/\.ply$/i.test(lower)) {
+      // If user drops a PLY file, route via PLY path
+      const url = URL.createObjectURL(file);
+      try { await loadSplatPLY(url); } finally { URL.revokeObjectURL(url); }
+      return;
+    } else {
+      throw new Error("Unsupported file for splats");
+    }
+
+    splat.name = `CM_ImageSplat_${Date.now()}`;
+    markSelectableDeep(splat, true);
+    splat.position.set(0, 1.25, 0); // raise a bit above ground
+    splatRoot.add(splat);
+    trackPoints(splat, splat.name);
+  }
+
+  function clearSplats() {
+    while (splatRoot.children.length) disposeObject3D(splatRoot.children[0]);
+  }
+
+  // UI events
+  window.addEventListener("splat.demo" as any, (e: any) => {
+    const { count = 20000, radius = 2 } = e.detail || {};
+    spawnSplatDemo(count, radius);
+  });
+  window.addEventListener("splat.loadPLY" as any, (e: any) => {
+    const { url } = e.detail || {};
+    if (url) void loadSplatPLY(url);
+  });
+  window.addEventListener("splat.clear" as any, () => clearSplats());
+  window.addEventListener("splat.fromFile" as any, (e: any) => {
+    const { file, opts } = e.detail || {};
+    if (file) void loadSplatFromFile(file, opts);
+  });
+
   function clearScene() {
     // env/background
     const bg: any = scene.background;
@@ -900,6 +992,9 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
 
     // meshes
     while (rootGroup.children.length) disposeObject3D(rootGroup.children[0]);
+
+    // splats
+    clearSplats();
 
     // procedural
     stopProcedural();
@@ -922,7 +1017,7 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     shadowPlane.position.y = y;
     shadowPlane.rotation.x = -Math.PI / 2 + rx;
     shadowPlane.rotation.z = rz;
-    if (grass) grass.group.position.y = y + 0.001; // prevent z-fight with catcher
+    if (grass) grass.group.position.y = y + 0.001;
   }
 
   function setQuality(mode: "performance" | "balanced" | "quality") {
@@ -994,12 +1089,11 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     setGround,
     setQuality,
 
-    // character & props — adopt to root + selectable
+    // character & props
     async loadRose(url: string = "/assets/rose.glb") { const n = await loadRose(scene, url); adoptToRoot(n as any); return n; },
     unloadRose() { return unloadRose(scene); },
     playRoseAction(action: "walk" | "run" | "jump", loops = 2) { return playRoseAction(action, loops); },
 
-    // FIX: adopt the actual mesh (not wrapper object)
     loadTestBall() {
       const res = loadTestBall(scene) as { node: THREE.Object3D } | any;
       const node = res?.node ?? res;
@@ -1026,6 +1120,12 @@ export async function bootOnCanvas(rootDiv: HTMLElement): Promise<CanvasMindAPI>
     // procedural
     async startProcedural() { await startProcedural(); },
     stopProcedural() { stopProcedural(); },
+
+    // splats
+    spawnSplatDemo,
+    loadSplatPLY,
+    loadSplatFromFile,
+    clearSplats,
 
     getState,
     dispose() {

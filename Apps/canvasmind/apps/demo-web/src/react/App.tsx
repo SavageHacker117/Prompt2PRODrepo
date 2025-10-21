@@ -1,5 +1,6 @@
 import React from "react";
 import CanvasPane from "./CanvasPane";
+import DevConsole from "../ui/DevConsole";
 
 declare global {
   interface Window {
@@ -372,6 +373,9 @@ export default function App() {
       <div style={{height:"100vh"}}>
         <CanvasPane />
       </div>
+
+      {/* In-app dev console overlay (toggle with `) */}
+      <DevConsole />
     </div>
   );
 }
