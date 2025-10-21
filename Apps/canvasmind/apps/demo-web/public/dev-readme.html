@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CanvasMind – Developer Console Readme</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1220;
+    --panel: #0a0f18;
+    --ink: #e2e8f0;
+    --muted: #94a3b8;
+    --brand: #60a5fa;
+    --border: #1f2a44;
+    --chip: #0a1529;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    line-height: 1.55;
+  }
+  .wrap { max-width: 980px; margin: 40px auto; padding: 0 16px; }
+  h1, h2, h3 { line-height: 1.2; }
+  h1 { margin-top: 0; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 16px 0;
+  }
+  code, pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 13px;
+  }
+  pre {
+    background: #0a1529;
+    border: 1px solid var(--border);
+    padding: 12px;
+    border-radius: 8px;
+    overflow: auto;
+  }
+  .muted { color: var(--muted); }
+  .chip {
+    display: inline-block; background: var(--chip); border: 1px solid var(--border);
+    color: var(--ink); padding: 4px 8px; border-radius: 8px; margin-right: 6px; margin-bottom: 6px;
+  }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CanvasMind – Developer Console</h1>
+  <div class="muted">Press <strong>`</strong> to toggle the in-app console. Type <code>help</code> inside the console for a quick list.</div>
+
+  <div class="panel">
+    <h2>Quick Start</h2>
+    <ol>
+      <li>Open the console (<kbd>`</kbd>).</li>
+      <li>Try a splat demo:
+        <pre><code>splat.demo 30000 2</code></pre>
+      </li>
+      <li>Load your own image/video as splats:
+        <pre><code>splat.image</code></pre>
+        (Pick <em>jpg/png/mp4/webm</em>; it becomes a colored point cloud billboard.)
+      </li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <h2>All Commands</h2>
+    <pre><code>readme
+help
+splat.demo [count=20000] [radius=2]
+splat.loadply &lt;url&gt;
+splat.clear
+splat.image
+skybox &lt;prompt text&gt;
+mesh.spawn
+mesh.batch &lt;n&gt;
+clear.scene
+quality &lt;performance|balanced|quality&gt;
+proc.start
+proc.stop
+proc.regen
+</code></pre>
+    <div class="muted">Arguments are <em>space-separated</em> (no parentheses). Example: <code>splat.demo 120000 3</code></div>
+  </div>
+
+  <div class="panel">
+    <h2>Splat Recipes (Fun Tests)</h2>
+    <div class="grid">
+      <div>
+        <h3>Dense disc (perf check)</h3>
+        <pre><code>splat.demo 120000 3
+quality performance</code></pre>
+      </div>
+      <div>
+        <h3>Huge sparse field</h3>
+        <pre><code>splat.demo 400000 12
+quality balanced</code></pre>
+      </div>
+      <div>
+        <h3>Load ASCII PLY</h3>
+        <pre><code>splat.loadply /assets/your_cloud.ply</code></pre>
+        <div class="muted">Drop a PLY under <code>apps/demo-web/public/assets/</code>.</div>
+      </div>
+      <div>
+        <h3>Image → splats</h3>
+        <pre><code>splat.image</code></pre>
+        <div class="muted">Pick a transparent PNG to keep only opaque pixels.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Skybox &amp; Mesh</h2>
+    <pre><code>skybox aurora nebula, photoreal
+mesh.spawn
+mesh.batch 5</code></pre>
+    <div class="muted">Mesh &amp; skybox calls prefer a selected MCP server if available.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Procedural Playground</h2>
+    <pre><code>proc.start
+proc.regen
+proc.stop</code></pre>
+    <div class="muted">Use the “Procedural” tab sliders; changes apply instantly.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Performance Tips</h2>
+    <ul>
+      <li>Use <span class="chip">quality performance</span> for stress tests.</li>
+      <li>Point size in image-splats is ~<code>0.02</code>; denser pixels → more points.</li>
+      <li>Clear everything: <span class="chip">clear.scene</span> (also resets budgets).</li>
+      <li>During gizmo drag we auto-relax shadows/pixel ratio to keep FPS high.</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2>Save/Share (Coming Soon)</h2>
+    <p>We’re adding a lightweight “session seed” and an on-disk temp cache for uploaded files:</p>
+    <ul>
+      <li><strong>Temp uploads cache:</strong> IndexedDB blob store (cleared on “clear.scene” or page close, optional persist toggle).</li>
+      <li><strong>Shareable scene seeds:</strong> a compact JSON (or URL hash) with generator params + asset refs.</li>
+      <li><strong>Commands planned:</strong> <code>scene.save</code>, <code>scene.load &lt;seed&gt;</code>, <code>scene.copyurl</code>.</li>
+    </ul>
+    <p class="muted">For now, use the Sidebar “Screenshot” or rely on the console commands above.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Troubleshooting</h2>
+    <ul>
+      <li><em>“app not ready”</em> → boot is still initializing; run the command again.</li>
+      <li>PLY not loading? Make sure it’s ASCII with positions (and optional colors).</li>
+      <li>Video splats: we sample the first frame; try a frame with clear foreground.</li>
+    </ul>
+  </div>
+
+  <p class="muted">© CanvasMind • Build wild things.</p>
+</div>
+</body>
+</html>

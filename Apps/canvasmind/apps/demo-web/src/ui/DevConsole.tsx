@@ -4,12 +4,17 @@ import React, { useEffect, useRef, useState } from "react";
  *  Hotkeys:
  *    • ` (backtick) — toggle (unless typing in an input/textarea/contentEditable)
  *    • Esc         — close
+ *
+ *  New:
+ *    • Commands are the same (splat.*, mesh.*, etc.).
+ *    • JS mode: `js <code>` (multi-line supported). Shift+Enter for newline, Enter to run.
+ *      Scope: app (CanvasMindApp), scene, renderer, THREE (imported), window, console.
  */
 export default function DevConsole() {
   const [open, setOpen] = useState(false);
   const [line, setLine] = useState("");
   const [output, setOutput] = useState<string[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
   // focus when opened
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 0); }, [open]);
@@ -41,11 +46,45 @@ export default function DevConsole() {
   const append = (msg: string) =>
     setOutput(prev => [...prev.slice(-200), msg]); // keep last 200 lines
 
+  async function runJS(code: string) {
+    // Provide a tiny, friendly scope for snippets.
+    const app = (window as any).CanvasMindApp;
+    const scene = (window as any).__CM_SCENE;
+    const renderer = (window as any).__CM_RENDERER;
+    const THREE = (await import("three")).default;
+
+    // Async-friendly sandboxed function
+    const fn = new Function(
+      "app",
+      "scene",
+      "renderer",
+      "THREE",
+      "window",
+      "console",
+      `
+      try {
+        const __run = async () => {
+          ${code}
+        };
+        return __run();
+      } catch (e) { throw e; }
+    `);
+    return await fn(app, scene, renderer, THREE, window, console);
+  }
+
+  // Parse command: get first token + keep the raw rest for JS mode
+  function parseCommand(s: string) {
+    const trimmed = s.trim();
+    const m = /^(\S+)\s*/.exec(trimmed);
+    const cmd = (m?.[1] || "").toLowerCase();
+    const rest = trimmed.slice(m?.[0].length || 0);
+    const args = rest.length ? rest.split(/\s+/) : [];
+    return { cmd, rest, args };
+  }
+
   // NOTE: read CanvasMindApp fresh every run (don’t capture stale undefined)
   const run = async (cmdline: string) => {
-    const parts = cmdline.trim().split(/\s+/);
-    const cmd = (parts[0] || "").toLowerCase();
-    const args = parts.slice(1);
+    const { cmd, rest, args } = parseCommand(cmdline);
 
     // dynamic helper for image/file → splat
     async function imagePicker(opts: any = {}) {
@@ -81,20 +120,35 @@ export default function DevConsole() {
       switch (cmd) {
         case "help":
           append(`Commands:
+  readme | help.readme             (open docs)
   splat.demo [count=20000] [radius=2]
   splat.loadply <url>
   splat.clear
-  splat.image                        (file picker)
+  splat.image                      (file picker)
   skybox <prompt>
   mesh.spawn
   mesh.batch <n>
   clear.scene
   quality <performance|balanced|quality>
   proc.start | proc.stop | proc.regen
+  js <code>                        (run JS; Shift+Enter for newline)
 
 Notes:
 - Use spaces for arguments (e.g., "splat.demo 30000 2"), not parentheses.`);
           break;
+
+        case "readme":
+        case "help.readme":
+          window.open("/dev-readme.html", "_blank", "noopener");
+          append("Opened /dev-readme.html");
+          break;
+
+        case "js": {
+          if (!rest.trim()) { append("ERR usage: js <code>"); break; }
+          const res = await runJS(rest);
+          append(typeof res === "undefined" ? "OK  (no return value)" : `OK  ${String(res)}`);
+          break;
+        }
 
         case "splat.demo": {
           if (!app?.spawnSplatDemo) { append("ERR app not ready"); break; }
@@ -123,7 +177,7 @@ Notes:
 
         case "skybox": {
           if (!app?.applySkybox) { append("ERR app not ready"); break; }
-          const prompt = args.join(" ");
+          const prompt = rest; // keep spaces
           await app.applySkybox(prompt);
           append(`OK  skybox "${prompt}"`);
           break;
@@ -230,8 +284,25 @@ Notes:
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
           <strong style={{ color: "#93c5fd" }}>CanvasMind Console</strong>
           <span style={{ opacity: 0.7, fontSize: 12 }}>
-            ` to toggle • type <em>help</em>
+            ` to toggle • Enter = run • Shift+Enter = newline • type <em>help</em>
           </span>
+          <a
+            href="/dev-readme.html"
+            target="_blank"
+            rel="noopener"
+            style={{
+              marginLeft: "auto",
+              fontSize: 12,
+              color: "#60a5fa",
+              textDecoration: "none",
+              border: "1px solid #1f2a44",
+              padding: "4px 8px",
+              borderRadius: 6,
+              background: "#0a1529"
+            }}
+          >
+            README
+          </a>
         </div>
         <div
           style={{
@@ -253,13 +324,22 @@ Notes:
             output.map((l, i) => <div key={i}>{l}</div>)
           )}
         </div>
+
         <form onSubmit={onSubmit} style={{ display: "flex", gap: 8 }}>
-          <input
-            ref={inputRef}
+          <textarea
+            ref={inputRef as any}
             value={line}
             onChange={e => setLine(e.target.value)}
-            placeholder='Type a command… (help)'
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                // submit the form
+                void onSubmit(e as any);
+              }
+            }}
+            placeholder={'Type a command… (help)\nExamples:\n  splat.demo 30000 2\n  js app.spawnSplatDemo(5000,1);\n  js /* multi-line ok */\n     const n=2; for(let i=0;i<n;i++) await app.spawnMesh();'}
             spellCheck={false}
+            rows={3}
             style={{
               flex: 1,
               background: "#0a0f18",
@@ -267,7 +347,8 @@ Notes:
               color: "#e2e8f0",
               borderRadius: 8,
               padding: "10px 12px",
-              outline: "none"
+              outline: "none",
+              resize: "vertical"
             }}
           />
           <button
@@ -278,7 +359,8 @@ Notes:
               border: "none",
               padding: "10px 14px",
               borderRadius: 8,
-              cursor: "pointer"
+              cursor: "pointer",
+              height: "fit-content"
             }}
           >
             Run
