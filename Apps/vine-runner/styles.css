@@ -1,0 +1,492 @@
+/* =========================
+   Base
+========================= */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #101418;
+  color: #fff;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+#c { display: block; width: 100vw; height: 100vh; }
+
+/* =========================
+   Panels (menus)
+========================= */
+.panel {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20,24,28,0.9);
+  padding: 24px 28px;
+  border-radius: 12px;
+  display: none;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+}
+.panel.show { display: block; }
+.panel h1, .panel h2 { margin-top: 0; }
+.panel button {
+  padding: 10px 16px; margin-top: 12px;
+  background: #38bdf8; border: none; border-radius: 6px;
+  color: #03131b; font-weight: 700; cursor: pointer;
+}
+.panel button:hover { background: #7dd3fc; }
+
+/* =========================
+   HUD
+========================= */
+.hud {
+  position: absolute;
+  top: 16px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.35);
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: none;
+  gap: 24px;
+  font-weight: 700;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  z-index: 9000;
+}
+.hud span { margin: 0 12px; }
+#hud.show { display: inline-flex; }
+
+/* Health bar */
+#hud #hudHealth,
+.hud-health {
+  margin-left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+.hp-bar {
+  width: 160px; height: 12px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.hp-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #22c55e, #84cc16);
+  transition: width .15s ease;
+}
+
+/* Gamepad pill */
+.hud .hud-pad {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  min-width: 90px;
+  justify-content: center;
+}
+.hud .pad-dot,
+.hud .gp-led {
+  width: 10px; height: 10px;
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.6) inset, 0 0 6px rgba(0,0,0,0.3);
+  background: #64748b; /* off */
+}
+.hud .pad-dot.on,
+.hud .gp-led.on  { background: #22c55e; box-shadow: 0 0 4px #22c55e, 0 0 10px #166534; }
+.hud .pad-text,
+.hud .gp-label { opacity: .95; }
+
+/* =========================
+   Debug console (backtick `)
+========================= */
+#dbg {
+  position: fixed;
+  left: 16px; bottom: 16px;
+  width: 400px;
+  background: rgba(12,16,22,0.96);
+  color: #e2e8f0;
+  border: 1px solid #223041;
+  border-radius: 12px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+  z-index: 9999;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+#dbg.hidden { display: none; }
+#dbg.min .dbg-log, #dbg.min .dbg-in { display: none; }
+
+#dbg .dbg-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-weight: 800;
+  border-bottom: 1px solid #223041;
+}
+#dbg .dbg-actions { display: flex; gap: 6px; }
+#dbg .dbg-actions button {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 2px 8px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+#dbg .dbg-actions button:hover { background: #1f2937; }
+
+#dbg .dbg-log {
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+#dbg .dbg-in {
+  width: calc(100% - 20px);
+  margin: 8px 10px 12px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #0b1015;
+  color: #e2e8f0;
+  outline: none;
+}
+#dbg .dbg-in::placeholder { color: #8aa0b2; }
+
+/* =========================
+   Animation Panel
+========================= */
+.anim-panel {
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  width: 280px;
+  background: rgba(10,14,18,0.95);
+  color: #e2e8f0;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  z-index: 9500;
+}
+.anim-panel.hidden { display: none; }
+.anim-head { font-weight: 800; margin-bottom: 8px; }
+.anim-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.anim-select { flex: 1; }
+.anim-panel button {
+  padding: 6px 10px;
+  border: 1px solid #334155;
+  background: #0b1015;
+  color: #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.anim-panel button:hover { background: #111827; }
+.anim-panel input[type="range"] { flex: 1; }
+
+/* When docked inside ScriptPanel (optional) */
+.anim-panel.docked {
+  position: static; right: auto; top: auto; width: 100%;
+  background: transparent; border: none; box-shadow: none; padding: 0;
+}
+
+/* =========================
+   Script Panel (Motion & Procedural)
+========================= */
+.script-panel {
+  position: fixed;
+  right: 12px;
+  top: 220px;              /* sits below the Animation Panel */
+  width: 340px;
+  background: rgba(10,14,18,0.96);
+  color: #e2e8f0;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.45);
+  z-index: 9600;           /* above anim panel, below console */
+}
+.script-panel.hidden { display: none; }
+
+.script-panel .sp-head {
+  display:flex; align-items:center; justify-content:space-between;
+  font-weight:800; margin-bottom:8px;
+  cursor: move;           /* draggable via JS */
+}
+.script-panel .sp-actions button {
+  padding: 4px 8px;
+  border: 1px solid #334155;
+  background: #0b1015;
+  color: #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.script-panel .sp-actions button:hover { background:#111827; }
+
+.script-panel .sp-tabs {
+  display:flex; gap:8px; padding:6px 6px 0 6px; margin:0 -4px 4px -4px;
+  border-bottom: 1px solid #223041;
+}
+.script-panel .sp-tab {
+  background:#11161c;
+  border:1px solid #223041;
+  color:#cfd6df;
+  padding:6px 10px;
+  border-radius:8px 8px 0 0;
+  cursor:pointer;
+}
+.script-panel .sp-tab.on {
+  background:#1a2028; color:#fff; border-bottom-color:#1a2028; font-weight:700;
+}
+
+.script-panel .sp-row { display:flex; gap:8px; align-items:center; margin:8px 0; }
+.script-panel .sp-btns button { margin-left: 6px; }
+
+.script-panel .sp-select,
+.script-panel .sp-bone,
+.script-panel .sp-mode,
+.script-panel .sp-filter {
+  flex:1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0b1015;
+  color: #e2e8f0;
+}
+.script-panel .sp-bone { height: 160px; }
+
+.script-panel .sp-pane.hidden { display:none; }
+
+.script-panel .sp-editor textarea.sp-json,
+.script-panel .sp-editor textarea.sp-code {
+  width:100%; min-height:160px; resize:vertical;
+  padding:8px; border-radius:8px; border:1px solid #334155; background:#0b1015; color:#e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px;
+}
+.script-panel .sp-hint { opacity:.65; font-size:12px; }
+.script-panel .anim-dock { margin-top:8px; padding-top:8px; border-top:1px solid #223041; }
+
+/* Resize handle */
+.script-panel .sp-resize {
+  position: absolute;
+  right: 6px; bottom: 6px;
+  width: 16px; height: 16px;
+  border-right: 2px solid #334155;
+  border-bottom: 2px solid #334155;
+  cursor: nwse-resize;
+  opacity: .7;
+}
+
+.script-panel button {
+  padding:6px 10px;
+  border:1px solid #334155;
+  background:#0b1015;
+  color:#e2e8f0;
+  border-radius:8px;
+  cursor:pointer;
+}
+.script-panel button:hover { background:#111827; }
+
+/* =========================
+   Controller Mapper Overlay (CLASS-BASED legacy)
+========================= */
+:root{
+  --hs-border: 2px;
+  --hs-radius: 14px;
+  --hs-glow: 18px;
+}
+.pad-overlay {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.55);
+  z-index: 9800;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: padFade .12s ease-out;
+}
+.pad-overlay.hidden { display: none; }
+
+.pad-bg {
+  position: relative;
+  width: min(88vw, 1200px);
+  max-height: 84vh;
+  aspect-ratio: 16 / 9;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(1.06) contrast(1.04) drop-shadow(0 10px 32px rgba(0,0,0,.55));
+  user-select: none;
+}
+
+.pad-hs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.pad-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%) translateZ(0);
+  border: var(--hs-border) solid rgba(255,255,255,.42);
+  background: rgba(255,255,255,.05);
+  border-radius: var(--hs-radius);
+  box-shadow: inset 0 0 10px rgba(0,0,0,.25);
+  transition: background .06s ease, box-shadow .06s ease, border-color .06s ease;
+  will-change: transform, box-shadow, background, border-color;
+}
+.pad-hotspot.on {
+  background: rgba(56,189,248,.55);
+  border-color: rgba(56,189,248,.9);
+  box-shadow: 0 0 var(--hs-glow) rgba(56,189,248,.85), 0 0 52px rgba(56,189,248,.35), inset 0 0 6px rgba(255,255,255,.35);
+}
+.pad-help {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  color: #e2e8f0; font-weight: 600; background: rgba(0,0,0,.35);
+  padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.15);
+  -webkit-backdrop-filter: blur(1.5px); backdrop-filter: blur(1.5px);
+}
+
+/* =========================
+   Controller Mapper Overlay (modern clickable)
+========================= */
+#padOverlay {
+  position: fixed;
+  inset: 0;
+  display: none;                /* toggled with .show in JS */
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  z-index: 12000;
+  animation: padFade .12s ease-out;
+}
+#padOverlay.show { display: flex; }
+
+.pad-ui {
+  position: relative;
+  width: min(88vw, 1200px);
+  max-height: 84vh;
+  aspect-ratio: 16 / 9;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: brightness(1.06) contrast(1.04) drop-shadow(0 10px 32px rgba(0,0,0,.55));
+  user-select: none;
+}
+
+/* Close button */
+.pad-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.25);
+  color: #e2e8f0;
+  background: rgba(0,0,0,.45);
+  display: grid; place-items: center;
+  cursor: pointer;
+  font-size: 18px; line-height: 1;
+}
+.pad-close:hover { background: rgba(0,0,0,.6); }
+
+/* markers */
+.pad-ring,
+.pad-trigger,
+.pad-stick {
+  position: absolute;
+  pointer-events: auto;         /* CLICKABLE */
+  cursor: pointer;
+  will-change: transform;
+}
+
+/* buttons/bumpers (pill/ring) */
+.pad-ring {
+  border: 2px solid rgba(255,255,255,.78);
+  border-radius: 999px;
+  box-shadow: inset 0 0 10px rgba(0,0,0,.45), 0 0 1px rgba(255,255,255,.35);
+  background: rgba(255,255,255,.04);
+  transition: box-shadow .08s ease, border-color .08s ease, background .08s ease;
+}
+.pad-ring.on {
+  border-color: #22c55e;
+  box-shadow:
+    0 0 0 4px rgba(34,197,94,.32),
+    0 0 22px rgba(34,197,94,.65),
+    inset 0 0 8px rgba(255,255,255,.35);
+  background: rgba(34,197,94,.08);
+}
+
+/* label badge near each ring */
+.pad-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  margin-top: 36px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #e2e8f0;
+  background: rgba(0,0,0,.42);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 8px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* triggers with fill */
+.pad-trigger {
+  border: 2px solid rgba(255,255,255,.75);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255,255,255,.02);
+  box-shadow: inset 0 0 10px rgba(0,0,0,.25);
+}
+.pad-trigger .fill {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 0 16px rgba(34,197,94,.5);
+  transition: height .06s ease;
+}
+
+/* sticks with precise center dot */
+.pad-stick {
+  border: 2px solid rgba(255,255,255,.75);
+  border-radius: 999px;
+  box-shadow: inset 0 0 10px rgba(0,0,0,.25);
+  background: rgba(255,255,255,.02);
+}
+.pad-stick .dot {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 12px; height: 12px; margin: -6px 0 0 -6px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+  transform: translate(-50%,-50%);
+}
+
+/* helper text */
+.pad-help {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  color: #e2e8f0; font-weight: 600; background: rgba(0,0,0,.35);
+  padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.15);
+  -webkit-backdrop-filter: blur(1.5px);
+  backdrop-filter: blur(1.5px);
+}
+
+/* subtle fade for overlays */
+@keyframes padFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================
+   Small screens
+========================= */
+@media (max-width: 640px) {
+  .anim-panel { width: 240px; right: 8px; top: 8px; }
+  .script-panel { width: 260px; right: 8px; top: 200px; }
+  .hud { gap: 12px; padding: 6px 8px; }
+  .hp-bar { width: 120px; }
+  .pad-bg, .pad-ui { width: min(96vw, 820px); max-height: 80vh; }
+}

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vine Runner</title>
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- Intro overlay styles (self-contained so we don’t touch styles.css) -->
+  <style>
+    :root {
+      --pill-bg: rgba(255,255,255,0.12);
+      --pill-border: rgba(255,255,255,0.35);
+      --pill-glow: rgba(0, 200, 255, 0.65);
+      --pill-text: #f8fbff;
+    }
+
+    /* Fullscreen intro layer */
+    #intro {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    #introVideo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: saturate(1.1) contrast(1.05);
+      pointer-events: none; /* don't eat clicks */
+    }
+
+    /* Subtle vignette so text pops */
+    #intro::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%);
+      pointer-events: none;
+    }
+
+    /* “Tap to Play” pill */
+    #tapToPlay {
+      position: relative;
+      z-index: 1;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+
+      padding: 14px 22px;
+      border-radius: 999px;
+
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      color: var(--pill-text);
+      font: 700 18px/1.1 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      letter-spacing: 0.35px;
+
+      backdrop-filter: blur(10px) saturate(1.2);
+      -webkit-backdrop-filter: blur(10px) saturate(1.2);
+
+      /* Neon-ish outer glow + subtle inner outline */
+      box-shadow:
+        0 0 18px var(--pill-glow),
+        inset 0 0 0 2px rgba(255,255,255,0.05);
+      text-shadow: 0 0 6px rgba(0,0,0,0.65);
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    #tapToPlay:hover { transform: translateY(-1px) scale(1.02); }
+    #tapToPlay:active { transform: translateY(0) scale(0.98); background: rgba(255,255,255,0.18); }
+
+    /* Position pill toward lower middle so it’s not over the FLSGAMES.com area */
+    #intro .pill-wrap {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: clamp(8vh, 14vh, 20vh);
+      z-index: 1;
+    }
+
+    /* Tiny audio widget (bottom-right) */
+    .audio-widget {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #e8f6ff;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .audio-widget button {
+      all: unset;
+      display: inline-block;        /* ensure layout */
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.25);
+      font-weight: 700;
+      color: #e8f6ff;
+    }
+    .audio-widget input[type="range"] {
+      width: 120px;
+      accent-color: #5fd8ff;
+      height: 4px;
+      cursor: pointer;
+    }
+
+    /* Hide game UI while intro overlay is visible */
+    body.intro-active #ui { display: none; }
+  </style>
+</head>
+<body class="intro-active">
+  <!-- INTRO OVERLAY -->
+  <div id="intro" aria-label="Intro video, tap to play">
+    <video id="introVideo" autoplay loop muted playsinline preload="auto">
+      <source src="assets/intro.mp4" type="video/mp4"/>
+    </video>
+
+    <div class="pill-wrap">
+      <div id="tapToPlay" title="Tap to Play">Tap to Play</div>
+    </div>
+
+    <div class="audio-widget">
+      <button id="btnAudio" title="Toggle audio">Unmute</button>
+      <input id="volSlider" type="range" min="0" max="1" step="0.05" value="0.6" />
+    </div>
+  </div>
+
+  <!-- GAME UI -->
+  <div id="ui">
+    <div id="mainMenu" class="panel">
+      <h1>Vine Runner</h1>
+      <button id="btnStart">Start</button>
+    </div>
+
+    <div id="pauseMenu" class="panel">
+      <h2>Paused</h2>
+      <button id="btnResume">Resume</button>
+      <button id="btnQuit">Quit</button>
+    </div>
+
+    <div id="levelComplete" class="panel">
+      <h2>Level Complete!</h2>
+      <button id="btnNext">Next Level</button>
+    </div>
+
+    <div id="gameOver" class="panel">
+      <h2>Game Over</h2>
+      <button id="btnRetry">Retry</button>
+    </div>
+
+    <!-- Top HUD -->
+    <div id="hud" class="hud">
+      <span id="hudLevel">Level 1/10</span>
+      <span id="hudScore">Score 0</span>
+      <!-- Health injected by HUD.js -->
+    </div>
+  </div>
+
+  <!-- Panels created by code (keep node for predictable HMR if you use it) -->
+  <div id="animPanel" class="anim-panel hidden"></div>
+
+  <canvas id="c"></canvas>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
