@@ -1,0 +1,101 @@
+/* ===== Fancy Multi-Layer Health Bars for Ring Rivals ===== */
+
+:root{
+  --hp-height: 18px;
+  --hp-width: 468px;     /* ~30% larger */
+  --hp-bg: rgba(255,255,255,.10);
+  --hp-gloss: linear-gradient(to bottom, rgba(255,255,255,.25), rgba(255,255,255,0));
+  --hp-tick: rgba(255,255,255,.14);
+}
+
+/* Row centered under the clock */
+.hpRow{
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  display:flex; gap:26px; align-items:center; pointer-events:none; z-index:25;
+}
+
+/* One bar (player or cpu) */
+.hpBar{
+  --a: #5a6bff;   /* default gradient A */
+  --b: #61f0ff;   /* default gradient B */
+  width: var(--hp-width); height: var(--hp-height);
+  position:relative; border-radius: 999px; overflow:hidden;
+  filter: drop-shadow(0 2px 12px rgba(0,0,0,.35));
+}
+
+/* mirror the CPU so its glow flows the other way */
+.hpBar.hp--right .hpBar__fill{ background: linear-gradient(90deg,var(--b),var(--a)); }
+.hpBar.hp--left  .hpBar__fill{ background: linear-gradient(90deg,var(--a),var(--b)); }
+
+/* Base */
+.hpBar__bg{
+  position:absolute; inset:0; background: var(--hp-bg);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius:999px;
+}
+
+/* Ticks */
+.hpBar__ticks{
+  position:absolute; inset:1px; display:grid; grid-auto-flow:column;
+  grid-template-columns: repeat(20, 1fr); opacity:.65; mix-blend-mode:screen;
+}
+.hpBar__ticks::before{
+  content:""; position:absolute; inset:0; background: repeating-linear-gradient(
+    to right, transparent 0  calc(5% - 1px), var(--hp-tick) calc(5% - 1px) calc(5% + 1px)
+  );
+}
+
+/* Main fill */
+.hpBar__fill, .hpBar__loss, .hpBar__shield{
+  position:absolute; left:0; top:0; bottom:0;
+  width: 100%; border-radius:999px; will-change: width;
+}
+
+/* Immediate value */
+.hpBar__fill{
+  box-shadow: 0 0 16px rgba(97,240,255,.45);
+  transition: width .12s ease-out;
+}
+
+/* Delayed damage trail (slides down to the new width) */
+.hpBar__loss{
+  background: linear-gradient(90deg,#ff6262,#ffb06a);
+  filter: blur(.5px) saturate(1.1);
+  z-index:-1; opacity:.85;
+  transition: width .8s cubic-bezier(.2,.7,0,1);
+}
+
+/* Optional shield overlay */
+.hpBar__shield{
+  background: repeating-linear-gradient(135deg, rgba(180,220,255,.45) 0 8px, rgba(180,220,255,.15) 8px 16px);
+  mix-blend-mode: screen; opacity:.0; transition: width .15s ease, opacity .2s ease;
+}
+
+/* Gloss */
+.hpBar__gloss{
+  position:absolute; left:0; right:0; height:55%;
+  top:0; background: var(--hp-gloss); pointer-events:none;
+}
+
+/* Labels */
+.hpBar__name{
+  position:absolute; top:-18px; font-size:12px; letter-spacing:.08em;
+  color:#cfe4ff; text-shadow:0 1px 4px rgba(0,0,0,.6);
+}
+
+/* Low health pulse */
+.hpBar.low .hpBar__fill{ animation: hpPulse .7s ease-in-out infinite; }
+@keyframes hpPulse{
+  0%,100%{ filter: drop-shadow(0 0 6px rgba(255,120,120,.45)); }
+  50%    { filter: drop-shadow(0 0 14px rgba(255,120,120,.85)); }
+}
+
+/* Player/CPU color themes */
+.hp--left  { --a:#5a6bff; --b:#61f0ff; }
+.hp--right { --a:#61f0ff; --b:#5a6bff; }
+
+/* Mobile tweaks */
+@media (max-width: 900px){
+  :root { --hp-width: 300px; --hp-height: 16px; }
+  .hpBar__name{ top:-16px; }
+}

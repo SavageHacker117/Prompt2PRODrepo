@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+    <title>Ring Rivals • FLSGAMES</title>
+    <link rel="stylesheet" href="/style.css" />
+    <!-- Fancy HP bars -->
+    <link rel="stylesheet" href="/HUDbar.css" />
+    <!-- Player identity cards -->
+    <link rel="stylesheet" href="/HUDid.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!-- HUD -->
+    <div class="hud" id="hud">
+      <div class="topbar">
+        <div id="pName">Player</div>
+        <div id="clock">3:00</div>
+        <div id="oName">CPU</div>
+      </div>
+
+      <!-- Fancy multi-layer HP bars -->
+      <div id="hpRow" class="hpRow">
+        <div class="hpBar hp--left" id="pBar">
+          <div class="hpBar__bg"></div>
+          <div class="hpBar__ticks"></div>
+          <div class="hpBar__loss"   id="pLoss"></div>
+          <div class="hpBar__shield" id="pShield"></div>
+          <div class="hpBar__fill"   id="pFill"></div>
+          <div class="hpBar__gloss"></div>
+          <div class="hpBar__name"   id="pLabel">PLAYER</div>
+        </div>
+
+        <div class="hpBar hp--right" id="oBar">
+          <div class="hpBar__bg"></div>
+          <div class="hpBar__ticks"></div>
+          <div class="hpBar__loss"   id="oLoss"></div>
+          <div class="hpBar__shield" id="oShield"></div>
+          <div class="hpBar__fill"   id="oFill"></div>
+          <div class="hpBar__gloss"></div>
+          <div class="hpBar__name"   id="oLabel">CPU</div>
+        </div>
+      </div>
+
+      <div class="buffRow" id="pBuffs"></div>
+      <div class="buffRow" id="oBuffs"></div>
+
+      <div class="centerIntro" id="centerIntro">Big Fight Night</div>
+      <div class="roundInfo" id="roundInfo">Round 1</div>
+      <div class="replayTag" id="replayTag">REPLAY</div>
+
+      <div class="menu" id="mainMenu">
+        <div class="card">
+          <div style="font-size:22px; font-weight:800; margin-bottom:8px;">Ring Rivals</div>
+          <div>Choose Arena:</div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <div class="btn" data-arena="stadium">Stadium</div>
+            <div class="btn" data-arena="gym">Old Gym</div>
+            <div class="btn" data-arena="cyber">Cyber-Dome</div>
+          </div>
+          <div class="btn" id="startBtn">Start Match</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fullscreen Intro Gate -->
+    <div id="gate">
+      <video id="introVid" src="/vids/intro1.mp4" autoplay muted loop playsinline></video>
+      <div class="controls" onclick="event.stopPropagation()">
+        <button id="mute">Unmute</button>
+        <input id="vol" type="range" min="0" max="1" step="0.01" value="0.0" />
+      </div>
+      <a id="brandLink" target="_blank" rel="noopener" href="https://flsgames.com" onclick="event.stopPropagation()"></a>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+
+    <script>
+      const gate = document.getElementById('gate');
+      const vid  = document.getElementById('introVid');
+      const vol  = document.getElementById('vol');
+      const mute = document.getElementById('mute');
+
+      try { vid.muted = true; vid.volume = 0.0; } catch(e){}
+
+      vol.addEventListener('input', () => {
+        vid.muted = false;
+        vid.volume = parseFloat(vol.value);
+        mute.textContent = vid.muted ? 'Unmute' : 'Mute';
+      });
+
+      mute.addEventListener('click', () => {
+        vid.muted = !vid.muted;
+        if (!vid.muted && vid.volume === 0) { vid.volume = 0.4; vol.value = 0.4; }
+        mute.textContent = vid.muted ? 'Unmute' : 'Mute';
+      });
+
+      gate.addEventListener('click', async () => {
+        try { await vid.pause(); } catch(e){}
+        gate.classList.add('hidden');
+        window.dispatchEvent(new Event('user-gesture'));
+      });
+    </script>
+  </body>
+</html>
