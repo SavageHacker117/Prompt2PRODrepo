@@ -4,6 +4,7 @@ export function registerWorldGrammar(dbg: any) {
     (args: string[]) => {
       const sub = (args[0] || '').toLowerCase()
       const api = (window as any).__world
+
       if (!sub || sub === 'help') {
         return [
           'world reset         — reset to defaults',
@@ -12,19 +13,37 @@ export function registerWorldGrammar(dbg: any) {
           'world export        — download world.json',
         ]
       }
+
       if (!api) return 'world API not ready'
-      if (sub === 'reset') { api.reset?.(); return 'world reset' }
-      if (sub === 'clear') { api.clear?.(); return 'cleared' }
-      if (sub === 'groups' && (args[1]||'').toLowerCase()==='clear') { api.clearGroups?.(); return 'groups cleared' }
+
+      if (sub === 'reset') {
+        api.reset?.()
+        return 'world reset'
+      }
+
+      if (sub === 'clear') {
+        api.clear?.()
+        return 'cleared'
+      }
+
+      if (sub === 'groups' && (args[1] || '').toLowerCase() === 'clear') {
+        api.clearGroups?.()
+        return 'groups cleared'
+      }
+
       if (sub === 'export') {
         const data = api.export?.() || '{}'
-        const blob = new Blob([data], { type:'application/json' })
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'world.json'
-        a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 500)
+        const blob = new Blob([data], { type: 'application/json' })
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = 'world.json'
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(a.href), 500)
         return 'exported world.json'
       }
+
       return 'Unknown "world" subcommand (try "world help").'
     },
-    'World tools (type "world help").'
+    'World tools (type "world help").',
   )
 }

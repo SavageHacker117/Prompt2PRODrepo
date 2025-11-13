@@ -62,7 +62,7 @@ canvas{ display:block; outline:none }
   grid-template-columns:1fr 1fr;
   gap:12px;
   position:fixed;
-  left:12px; right:12px; top:12px;
+  left:12px; right:12px; top:56px; /* pushed down to clear toolbar */
   pointer-events:none;  /* children re-enable */
 }
 
@@ -131,6 +131,44 @@ canvas{ display:block; outline:none }
 .dock-add:hover{ background:#121722 }
 
 /* =========================================================
+   Top HUD toolbar (round buttons for panes)
+   ========================================================= */
+.hud-toolbar{
+  position:fixed;
+  top:10px; right:12px;
+  display:flex;
+  gap:8px;
+  pointer-events:all;
+  z-index:10;
+}
+
+.hud-tool-btn{
+  width:34px; height:34px;
+  border-radius:50%;
+  border:1px solid var(--border);
+  background:rgba(0,0,0,.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  box-shadow:0 0 0 1px rgba(0,0,0,.35);
+}
+
+.hud-tool-btn .hud-tool-label{
+  pointer-events:none;
+  font-size:15px;
+}
+
+.hud-tool-btn:hover{
+  background:rgba(255,255,255,.08);
+}
+
+.hud-tool-btn.on{
+  border-color:#3a75ff;
+  box-shadow:0 0 0 1px rgba(122,162,255,.55);
+}
+
+/* =========================================================
    Floating windows & controls
    ========================================================= */
 .floating{
@@ -167,6 +205,32 @@ canvas{ display:block; outline:none }
 input[type="range"]{ appearance:none; height:4px; border-radius:4px; background:#2b3340; outline:none }
 input[type="range"]::-webkit-slider-thumb{ appearance:none; width:12px; height:12px; border-radius:50%; background:var(--accent); border:0; margin-top:-4px }
 input[type="range"]::-moz-range-thumb{ width:12px; height:12px; border-radius:50%; background:var(--accent); border:0 }
+
+/* =========================================================
+   Spawn quick button (bottom-right crosshair)
+   ========================================================= */
+.spawn-quick{
+  position:fixed;
+  right:18px;
+  bottom:calc(var(--dock-h) + 18px);
+  width:44px; height:44px;
+  border-radius:50%;
+  background:rgba(0,0,0,.35);
+  backdrop-filter:blur(6px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #3a3f56;
+  cursor:pointer;
+  pointer-events:all;
+}
+.spawn-quick img{
+  width:28px; height:28px;
+  pointer-events:none;
+}
+.spawn-quick:hover{
+  background:rgba(255,255,255,.08);
+}
 
 /* =========================================================
    Options modal (Esc)
