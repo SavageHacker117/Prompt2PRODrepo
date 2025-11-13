@@ -1,0 +1,185 @@
+/* =========================================================
+   DAWN • global + HUD styles
+   ========================================================= */
+
+:root{
+  --bg:#0b0d10;
+  --fg:#e7eef7;
+  --muted:#97a3b6;
+  --panel:rgba(12,14,18,.85);
+  --panel-2:rgba(12,14,18,.70);
+  --accent:#7aa2ff;
+  --border:#2a2f3a;
+  --ok:#26d07c;
+  --danger:#e35b5b;
+  --dock-h: 240px; /* updated live by HUD */
+}
+
+*{ box-sizing:border-box }
+html,body,#root{ height:100%; margin:0; background:var(--bg); color:var(--fg) }
+body,button,input,select{
+  font:14px/1.35 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+}
+
+/* Canvas behind HUD */
+canvas{ display:block; outline:none }
+
+/* =========================================================
+   Console / overlay
+   ========================================================= */
+.overlay{ position:fixed; top:0; left:0; right:0; padding:6px 10px; font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; pointer-events:none }
+.console{ position:fixed; left:12px; bottom:12px; width:min(640px,calc(100% - 24px)); pointer-events:auto }
+.console input{
+  width:100%; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--border); background:var(--panel); color:var(--fg); outline:none
+}
+.console .help{ margin-top:6px; opacity:.7 }
+
+/* =========================================================
+   HUD shell
+   ========================================================= */
+.hud{ position:fixed; inset:0; pointer-events:none }
+.hud.compact .dock-area{ padding:6px }
+.hud.compact .dock-tab{ padding:4px 8px }
+
+/* Only disable drag hotspots in “locked” */
+.hud.locked .floating-title{ pointer-events:none; cursor:default }
+.hud.locked .float-resizer{ display:none }
+.hud.locked .dock-tab{ cursor:default }
+
+.ghost-note{
+  position:fixed; left:12px; right:12px; bottom:4px;
+  opacity:.70; text-align:center;
+  font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;
+  pointer-events:none;
+}
+
+/* =========================================================
+   TOP dock row (two columns)
+   ========================================================= */
+.dock-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  position:fixed;
+  left:12px; right:12px; top:12px;
+  pointer-events:none;  /* children re-enable */
+}
+
+/* =========================================================
+   Bottom dock (two columns)
+   ========================================================= */
+.dock-bottom{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  position:fixed;
+  left:12px; right:12px; bottom:12px;
+  height: var(--dock-h);
+  pointer-events:none;  /* children re-enable */
+  align-items:end;
+}
+
+/* Hide empty left column entirely in the bottom dock */
+.dock-bottom > .dock-area:first-child:has(.dock-tabbar:empty){ display:none; }
+
+/* panels */
+.dock-area{
+  background:var(--panel-2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:8px;
+  min-height:120px;
+  height: 100%;
+  pointer-events:all;
+  backdrop-filter: blur(6px);
+}
+
+.dock-tabbar{
+  display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;
+  min-height:28px;
+}
+.dock-tab{
+  padding:6px 10px; border-radius:8px;
+  border:1px solid var(--border);
+  background:#0e1218; color:var(--fg);
+  cursor:grab; user-select:none;
+}
+.dock-tab.active{ background:#101520; border-color:#3a4456; color:var(--accent) }
+
+.dock-body{ height: calc(100% - 34px); max-height:none; overflow:auto }
+
+/* resizer & toggle just above the dock */
+.dock-resizer{
+  position:fixed; left:12px; right:84px;
+  bottom: calc(var(--dock-h) + 16px);
+  height: 8px;
+  border-radius:4px;
+  background: rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);
+  cursor: ns-resize;
+  pointer-events:all;
+}
+.dock-resizer:hover{ background:rgba(255,255,255,.1) }
+
+.dock-add{
+  position:fixed; right:12px; bottom: calc(var(--dock-h) + 10px);
+  pointer-events:all;
+  padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+  background:#0d1016; color:var(--fg); cursor:pointer;
+}
+.dock-add:hover{ background:#121722 }
+
+/* =========================================================
+   Floating windows & controls
+   ========================================================= */
+.floating{
+  position:fixed; top:60px; left:60px;
+  background:rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px; pointer-events:all;
+}
+.floating-title{
+  display:flex; align-items:center; gap:8px;
+  padding:6px 8px; cursor:move; user-select:none;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.floating-title .btn{ margin-left:auto }
+.floating-body{ max-height:420px; overflow:auto; padding:8px }
+.float-resizer{
+  position:absolute; width:12px; height:12px; right:6px; bottom:6px;
+  cursor:nwse-resize; background:rgba(255,255,255,.15); border-radius:3px;
+}
+
+/* =========================================================
+   Panels, buttons, inputs
+   ========================================================= */
+.panel{ backdrop-filter: blur(6px); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:8px 10px; pointer-events:all }
+.row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+.label{ opacity:.75 }
+.btn{ padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:#0d1016; color:var(--fg); cursor:pointer }
+.btn:hover{ background:#121722 }
+.btn.ok{ border-color:rgba(38,208,124,.35) }
+.btn.danger{ background:#2a0f0f; border-color:#492424; color:#ffd2d2 }
+.input{ padding:6px 8px; border-radius:8px; border:1px solid var(--border); background:#0e1116; color:var(--fg) }
+.input.num{ width:56px }
+
+input[type="range"]{ appearance:none; height:4px; border-radius:4px; background:#2b3340; outline:none }
+input[type="range"]::-webkit-slider-thumb{ appearance:none; width:12px; height:12px; border-radius:50%; background:var(--accent); border:0; margin-top:-4px }
+input[type="range"]::-moz-range-thumb{ width:12px; height:12px; border-radius:50%; background:var(--accent); border:0 }
+
+/* =========================================================
+   Options modal (Esc)
+   ========================================================= */
+.opts-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.55);
+  display:flex; align-items:center; justify-content:center; pointer-events:all;
+}
+.opts-modal{
+  width:min(720px, calc(100% - 24px));
+  background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:10px;
+}
+.opts-title{ display:flex; gap:8px; align-items:center; margin-bottom:8px }
+.opts-section{ border:1px solid var(--border); border-radius:10px; padding:10px; margin-top:8px }
+.opts-header{ font-weight:600; margin-bottom:6px }
+.confirm{ background:#0f141b; border:1px solid var(--border); border-radius:10px; padding:10px }
