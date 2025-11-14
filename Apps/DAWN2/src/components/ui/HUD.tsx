@@ -1,3 +1,4 @@
+// src/components/ui/HUD.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useWorld } from '../../state/world'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -447,6 +448,15 @@ function ActorsPane() {
 
   const engine = useMemo(() => ((window as any).__engine ||= {}), [])
 
+  // One-time cleanup of old persisted blob: URLs which are invalid after refresh
+  useEffect(() => {
+    try {
+      localStorage.removeItem(LS_UPLOADS)
+    } catch {
+      // ignore
+    }
+  }, [])
+
   function baseName(u: string) {
     return (u.split('/').pop() || '').replace(/\.glb$/i, '').toLowerCase()
   }
@@ -512,18 +522,10 @@ function ActorsPane() {
       }
     } catch {}
 
-    // 3) uploads
-    let uploads: Model[] = []
-    try {
-      const raw = localStorage.getItem(LS_UPLOADS)
-      const arr = raw ? JSON.parse(raw) : []
-      if (Array.isArray(arr))
-        uploads = arr.map((u: any) => ({
-          name: u.name,
-          url: u.url,
-          source: 'upload' as const,
-        }))
-    } catch {}
+    // 3) uploads from previous sessions used to live in localStorage.
+    // Those blob: URLs are not valid after a refresh, so we keep this empty
+    // and treat uploads as session-only.
+    const uploads: Model[] = []
 
     // Merge & dedupe by URL and base filename (case-insensitive).
     // Priority: manifest > guess > upload
@@ -557,15 +559,14 @@ function ActorsPane() {
     const url = URL.createObjectURL(f)
     const name = f.name.replace(/\.glb$/i, '')
     const entry: Model = { name, url, source: 'upload' }
+
     // In-memory dedupe on upload too (by name)
     const nextMap = new Map(models.map((m) => [m.name.toLowerCase(), m]))
     nextMap.set(name.toLowerCase(), entry)
     const next = Array.from(nextMap.values())
     setModels(next)
-    localStorage.setItem(
-      LS_UPLOADS,
-      JSON.stringify(next.filter((m) => m.source === 'upload')),
-    )
+
+    // uploads are session-only now; do not persist blob: URLs
     e.currentTarget.value = ''
   }
 

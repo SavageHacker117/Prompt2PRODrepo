@@ -1,0 +1,43 @@
+.opts-backdrop{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.55);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:all;
+}
+
+.opts-modal{
+  width:min(720px, calc(100% - 24px));
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px;
+}
+
+.opts-title{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-bottom:8px;
+}
+
+.opts-section{
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px;
+  margin-top:8px;
+}
+
+.opts-header{
+  font-weight:600;
+  margin-bottom:6px;
+}
+
+.confirm{
+  background:#0f141b;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px;
+}

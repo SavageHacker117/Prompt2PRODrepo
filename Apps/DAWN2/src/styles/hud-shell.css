@@ -1,0 +1,266 @@
+/* =========================================================
+   DAWN • HUD shell & dock layout
+   (global colors / panel styles live in vars.css + panels.css)
+   ========================================================= */
+
+/* HUD root */
+.hud{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+}
+
+/* compact mode tweaks */
+.hud.compact .dock-area{ padding:6px }
+.hud.compact .dock-tab{ padding:4px 8px }
+
+/* Only disable drag hotspots in “locked” */
+.hud.locked .floating-title{ pointer-events:none; cursor:default }
+.hud.locked .float-resizer{ display:none }
+.hud.locked .dock-tab{ cursor:default }
+
+/* =========================================================
+   Tiny help bubble instead of long footer text
+   ========================================================= */
+
+.ghost-note{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+
+  width:26px;
+  height:26px;
+  border-radius:50%;
+
+  background:rgba(0,0,0,.45);
+  border:1px solid var(--border);
+  box-shadow:0 0 0 1px rgba(0,0,0,.40);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  font-size:0;           /* hide the long text */
+  opacity:.85;
+  pointer-events:all;
+}
+
+/* show a simple “?” icon */
+.ghost-note::after{
+  content:'?';
+  font-size:14px;
+  color:var(--fg);
+}
+
+/* =========================================================
+   TOP dock row (still available for future use)
+   ========================================================= */
+
+.dock-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  position:fixed;
+  left:12px;
+  right:12px;
+  top:56px;             /* pushed down to clear toolbar */
+  pointer-events:none;  /* children re-enable */
+}
+
+/* =========================================================
+   Right-side “drip down” dock for WORLD / SPAWNS / ACTORS
+   ========================================================= */
+
+.dock-bottom{
+  position:fixed;
+  top:56px;
+  right:12px;
+  left:auto;
+  bottom:auto;
+
+  width:min(460px, calc(100% - 24px));
+  max-height:calc(100vh - 72px);
+
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+
+  pointer-events:none;      /* children re-enable */
+  align-items:stretch;
+}
+
+/* Hide empty left column rule from old bottom layout */
+.dock-bottom > .dock-area:first-child:has(.dock-tabbar:empty){
+  display:none;
+}
+
+/* panels used inside dock rows */
+.dock-area{
+  background:var(--panel-2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:8px;
+  min-height:80px;
+
+  pointer-events:all;
+  backdrop-filter: blur(6px);
+
+  width:100%;
+  max-height:100%;
+  overflow:hidden;
+}
+
+/* Tab bar and tabs inside dock areas */
+.dock-tabbar{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-bottom:6px;
+  min-height:28px;
+}
+
+.dock-tab{
+  padding:6px 10px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:#0e1218;
+  color:var(--fg);
+  cursor:grab;
+  user-select:none;
+}
+
+.dock-tab.active{
+  background:#101520;
+  border-color:#3a4456;
+  color:var(--accent);
+}
+
+/* dock body scroll area */
+.dock-body{
+  height:auto;
+  max-height:calc(100vh - 120px);
+  overflow:auto;
+}
+
+/* remove old bottom dock resizer + add button */
+.dock-resizer,
+.dock-add{
+  display:none;
+}
+
+/* =========================================================
+   Top HUD toolbar (round buttons for panes)
+   ========================================================= */
+
+.hud-toolbar{
+  position:fixed;
+  top:10px;
+  right:16px;
+  display:flex;
+  gap:8px;
+  pointer-events:all;
+  z-index:20;
+}
+
+.hud-tool-btn{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:1px solid var(--border);
+  background:rgba(0,0,0,.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  box-shadow:0 0 0 1px rgba(0,0,0,.35);
+}
+
+.hud-tool-btn .hud-tool-label{
+  pointer-events:none;
+  font-size:15px;
+}
+
+.hud-tool-btn:hover{
+  background:rgba(255,255,255,.08);
+}
+
+.hud-tool-btn.on{
+  border-color:#3a75ff;
+  box-shadow:0 0 0 1px rgba(122,162,255,.55);
+}
+
+/* =========================================================
+   Floating windows & controls
+   ========================================================= */
+
+.floating{
+  position:fixed;
+  top:60px;
+  left:60px;
+  background:rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;
+  pointer-events:all;
+}
+
+.floating-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 8px;
+  cursor:move;
+  user-select:none;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+
+.floating-title .btn{
+  margin-left:auto;
+}
+
+.floating-body{
+  max-height:420px;
+  overflow:auto;
+  padding:8px;
+}
+
+.float-resizer{
+  position:absolute;
+  width:12px;
+  height:12px;
+  right:6px;
+  bottom:6px;
+  cursor:nwse-resize;
+  background:rgba(255,255,255,.15);
+  border-radius:3px;
+}
+
+/* =========================================================
+   Spawn quick button (bottom-right crosshair)
+   ========================================================= */
+
+.spawn-quick{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  background:rgba(0,0,0,.35);
+  backdrop-filter:blur(6px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #3a3f56;
+  cursor:pointer;
+  pointer-events:all;
+}
+
+.spawn-quick img{
+  width:28px;
+  height:28px;
+  pointer-events:none;
+}
+
+.spawn-quick:hover{
+  background:rgba(255,255,255,.08);
+}

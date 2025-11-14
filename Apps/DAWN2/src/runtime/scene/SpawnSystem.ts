@@ -1,7 +1,10 @@
+// src/runtime/scene/SpawnSystem.ts
 // create/bind/respawn spawn points + UI helpers
+
 import * as THREE from 'three'
 
 export type SpawnType = 'npc' | 'player' | 'vendor'
+
 export type SpawnPoint = {
   id: string
   type: SpawnType
@@ -12,6 +15,17 @@ export type SpawnPoint = {
   maxAlive: number
   alive: Set<string>
   marker: THREE.Object3D
+  host?: THREE.Object3D | null
+}
+
+export type CreateSpawnOptions = {
+  id?: string
+  type: SpawnType
+  name?: string
+  position?: THREE.Vector3
+  templateUrl?: string
+  respawnDelay?: number
+  maxAlive?: number
   host?: THREE.Object3D | null
 }
 
@@ -27,18 +41,25 @@ const TYPE_COLOR: Record<SpawnType, number> = {
 
 function makeMarker(p: THREE.Vector3, type: SpawnType) {
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(0.4, 0.05, 8, 24),
-    new THREE.MeshBasicMaterial({ color: TYPE_COLOR[type], transparent: true, opacity: 0.95 })
+    new THREE.TorusGeometry(0.4, 0.05, 12, 32),
+    new THREE.MeshBasicMaterial({
+      color: TYPE_COLOR[type],
+      transparent: true,
+      opacity: 0.95,
+    }),
   )
   ring.rotation.x = -Math.PI / 2
 
   const geo = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-0.35, 0.02, -0.35),
-    new THREE.Vector3( 0.35, 0.02,  0.35),
-    new THREE.Vector3( 0.35, 0.02, -0.35),
-    new THREE.Vector3(-0.35, 0.02,  0.35),
+    new THREE.Vector3(0.35, 0.02, 0.35),
+    new THREE.Vector3(0.35, 0.02, -0.35),
+    new THREE.Vector3(-0.35, 0.02, 0.35),
   ])
-  const line1 = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffffff }))
+  const line1 = new THREE.LineSegments(
+    geo,
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 }),
+  )
 
   const group = new THREE.Group()
   group.add(ring)
@@ -47,6 +68,7 @@ function makeMarker(p: THREE.Vector3, type: SpawnType) {
   group.name = 'SpawnMarker'
   group.userData.pickRoot = true
   group.userData.isSpawn = true
+
   return group
 }
 
@@ -61,8 +83,11 @@ export function initSpawnSystem(engine: any) {
     remove,
     bindActor,
     attachToObject,
-    getPickables: () => Array.from(_spawns.values()).map(s => s.marker),
     kill: onActorKilled,
+    // helpers for UI / grammars
+    findByMarker,
+    spawnOfActor,
+    getPickables: () => Array.from(_spawns.values()).map((s) => s.marker),
     ui: {
       tool: 'none' as 'none' | 'place' | 'attach',
       type: 'npc' as SpawnType,
@@ -74,9 +99,14 @@ export function initSpawnSystem(engine: any) {
   }
 }
 
-export function create(opts: Partial<SpawnPoint> & { type: SpawnType, host?: THREE.Object3D | null }): SpawnPoint {
+/**
+ * Create a spawn point.
+ * Usually called from the click-handler with { type, position, templateUrl }.
+ */
+export function create(opts: CreateSpawnOptions): SpawnPoint {
   const id = opts.id || `spawn_${Math.random().toString(36).slice(2, 8)}`
-  const pos = opts.position ? opts.position.clone() : new THREE.Vector3()
+
+  const pos = (opts.position ? opts.position.clone() : new THREE.Vector3())
   const marker = makeMarker(pos, opts.type)
 
   const sp: SpawnPoint = {
@@ -93,7 +123,7 @@ export function create(opts: Partial<SpawnPoint> & { type: SpawnType, host?: THR
   }
 
   marker.userData.spawnId = id
-  marker.userData.pickRoot = true
+  marker.userData.spawnType = opts.type
 
   if (sp.host) {
     sp.host.add(marker)
@@ -104,34 +134,51 @@ export function create(opts: Partial<SpawnPoint> & { type: SpawnType, host?: THR
 
   _spawns.set(id, sp)
   if (_engine?.spawns?.ui) _engine.spawns.ui.lastCreatedId = id
+
   console.debug('[SpawnSystem] created', sp)
   return sp
 }
 
 export function remove(id: string) {
-  const sp = _spawns.get(id); if (!sp) return
+  const sp = _spawns.get(id)
+  if (!sp) return
   sp.marker.parent?.remove(sp.marker)
   _spawns.delete(id)
   console.debug('[SpawnSystem] removed', id)
 }
 
+/**
+ * Bind a spawned actor root to a spawn point (used by respawn logic).
+ */
 export function bindActor(actorRoot: THREE.Object3D, spawnId: string) {
-  const sp = _spawns.get(spawnId); if (!sp) return
+  const sp = _spawns.get(spawnId)
+  if (!sp) return
+
   const wp = new THREE.Vector3()
   sp.marker.getWorldPosition(wp)
   actorRoot.position.copy(wp)
+
   actorRoot.userData.spawnId = spawnId
   actorRoot.userData.isActorRoot = true
   actorRoot.userData.pickRoot = true
+
   sp.alive.add(actorRoot.uuid)
+
   console.debug('[SpawnSystem] bind actor', actorRoot.uuid, '->', spawnId)
 }
 
+/**
+ * Attach an existing spawn marker to an object (platform, etc.).
+ */
 export function attachToObject(spawnId: string, host: THREE.Object3D | null) {
-  const sp = _spawns.get(spawnId); if (!sp) return
+  const sp = _spawns.get(spawnId)
+  if (!sp) return
+
   const wp = new THREE.Vector3()
   sp.marker.getWorldPosition(wp)
+
   sp.marker.parent?.remove(sp.marker)
+
   if (host) {
     host.add(sp.marker)
     sp.marker.position.set(0, 0, 0)
@@ -139,22 +186,49 @@ export function attachToObject(spawnId: string, host: THREE.Object3D | null) {
     _scene.add(sp.marker)
     sp.marker.position.copy(wp)
   }
+
   sp.host = host
   console.debug('[SpawnSystem] attach', spawnId, 'to', host?.name || '(scene)')
 }
 
+/**
+ * Called when an actor dies / is removed so we can respawn.
+ */
 export function onActorKilled(actorIdOrRoot: string | THREE.Object3D) {
   const id = typeof actorIdOrRoot === 'string' ? actorIdOrRoot : actorIdOrRoot.uuid
+
   for (const sp of _spawns.values()) {
-    if (sp.alive.delete(id)) {
-      console.debug('[SpawnSystem] actor removed', id, 'from', sp.id)
-      if (sp.templateUrl && sp.alive.size < sp.maxAlive) {
-        setTimeout(async () => {
-          const root = await _engine.spawnActor?.(sp.templateUrl)
-          if (root) bindActor(root, sp.id)
-        }, sp.respawnDelay * 1000)
-      }
-      break
+    if (!sp.alive.delete(id)) continue
+
+    console.debug('[SpawnSystem] actor removed', id, 'from', sp.id)
+
+    if (sp.templateUrl && sp.alive.size < sp.maxAlive) {
+      setTimeout(async () => {
+        const root = await _engine.spawnActor?.(sp.templateUrl)
+        if (root) bindActor(root, sp.id)
+      }, sp.respawnDelay * 1000)
     }
+    break
   }
+}
+
+/**
+ * Helper: find spawn given its marker (for world inspector etc.).
+ */
+export function findByMarker(marker: THREE.Object3D | null | undefined): SpawnPoint | undefined {
+  if (!marker) return undefined
+  for (const sp of _spawns.values()) {
+    if (sp.marker === marker) return sp
+  }
+  return undefined
+}
+
+/**
+ * Helper: given an actor root, find the spawn that owns it.
+ */
+export function spawnOfActor(actorRoot: THREE.Object3D | null | undefined): SpawnPoint | undefined {
+  if (!actorRoot) return undefined
+  const spawnId = actorRoot.userData?.spawnId as string | undefined
+  if (!spawnId) return undefined
+  return _spawns.get(spawnId)
 }

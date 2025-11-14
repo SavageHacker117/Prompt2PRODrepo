@@ -1,0 +1,25 @@
+/* Spawn quick button (bottom-right crosshair) */
+.spawn-quick{
+  position:fixed;
+  right:18px;
+  bottom:calc(var(--dock-h) + 18px);
+  width:44px; height:44px;
+  border-radius:50%;
+  background:rgba(0,0,0,.35);
+  backdrop-filter:blur(6px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #3a3f56;
+  cursor:pointer;
+  pointer-events:all;
+}
+
+.spawn-quick img{
+  width:28px; height:28px;
+  pointer-events:none;
+}
+
+.spawn-quick:hover{
+  background:rgba(255,255,255,.08);
+}

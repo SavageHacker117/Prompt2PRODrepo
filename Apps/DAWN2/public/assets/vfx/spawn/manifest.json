@@ -1,0 +1,17 @@
+[
+  {
+    "id": "ring_red_01",
+    "label": "Summon Ring",
+    "url": "/assets/vfx/spawn/ring_01.png"
+  },
+  {
+    "id": "skull_red_01",
+    "label": "Skull Marker",
+    "url": "/assets/vfx/spawn/skull_01.png"
+  },
+  {
+    "id": "sword_red_01",
+    "label": "Sword Marker",
+    "url": "/assets/vfx/spawn/sword_01.png"
+  }
+]

@@ -1,0 +1,62 @@
+:root{
+  --bg:#0b0d10;
+  --fg:#e7eef7;
+  --muted:#97a3b6;
+  --panel:rgba(12,14,18,.85);
+  --panel-2:rgba(12,14,18,.70);
+  --accent:#7aa2ff;
+  --border:#2a2f3a;
+  --ok:#26d07c;
+  --danger:#e35b5b;
+  --dock-h: 240px; /* updated live by HUD */
+}
+
+*{ box-sizing:border-box }
+
+html,body,#root{
+  height:100%;
+  margin:0;
+  background:var(--bg);
+  color:var(--fg);
+}
+
+body,button,input,select{
+  font:14px/1.35 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+}
+
+/* Canvas behind HUD */
+canvas{ display:block; outline:none }
+
+/* Console overlay that sits above the canvas */
+.overlay{
+  position:fixed; top:0; left:0; right:0;
+  padding:6px 10px;
+  font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  pointer-events:none;
+}
+
+.console{
+  position:fixed;
+  left:12px; bottom:12px;
+  width:min(640px,calc(100% - 24px));
+  pointer-events:auto;
+}
+
+.console input{
+  width:100%;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--fg);
+  outline:none;
+}
+
+.console .help{ margin-top:6px; opacity:.7 }
+
+.ghost-note{
+  position:fixed; left:12px; right:12px; bottom:4px;
+  opacity:.70; text-align:center;
+  font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;
+  pointer-events:none;
+}

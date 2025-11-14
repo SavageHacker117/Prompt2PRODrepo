@@ -1,3 +1,4 @@
+// src/components/ui/ActorManager.tsx
 import React, { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { addBinding } from '../../tools/BindingSystem'
@@ -6,129 +7,256 @@ function getEngine() {
   return (window as any).__engine || {}
 }
 
-/**
- * Normalize engine actors into {id,name,obj}
- * Supports both array and object maps:
- *   engine.actors = { [id]: { id, name, object } }  or  engine.actors = [...]
- */
-function listSceneActors(): { id: string; name: string; obj: THREE.Object3D }[] {
-  const eng = getEngine()
-  const raw = eng.actors || {}
-  const arr = Array.isArray(raw) ? raw : Object.values(raw)
-
-  const seen = new Set<string>()
-  const out: { id: string; name: string; obj: THREE.Object3D }[] = []
-
-  for (const a of arr as any[]) {
-    if (!a) continue
-
-    // common fields: object / root / group / node
-    const obj: THREE.Object3D | undefined =
-      a.object || a.root || a.group || a.node
-    if (!obj) continue
-
-    const id: string = a.id || obj.uuid
-    if (seen.has(id)) continue
-    seen.add(id)
-
-    const name: string =
-      a.name ||
-      obj.name ||
-      obj.userData?.name ||
-      id.slice(0, 8)
-
-    out.push({ id, name, obj })
-  }
-
-  return out
+type SceneActor = {
+  id: string          // engine actor id (actor_xxx)
+  name: string
+  obj: THREE.Object3D | null
+  api?: any           // GLBinject API for this actor, if available
 }
 
-function boneNames(root?: THREE.Object3D): string[] {
+/**
+ * Collect actors from __engine.actors (GLBinject) plus any loose actor roots
+ * in the scene. For GLBinject actors we keep the API so we can call
+ * setScale / injectRig / wag, etc.
+ */
+function collectActors(): SceneActor[] {
+  const eng = getEngine()
+  const out: SceneActor[] = []
+  const seen = new Set<THREE.Object3D>()
+
+  const push = (
+    id: string,
+    name: string,
+    obj: THREE.Object3D | null,
+    api?: any,
+  ) => {
+    if (obj && seen.has(obj)) return
+    if (obj) seen.add(obj)
+    out.push({ id, name, obj, api })
+  }
+
+  const rawActors = eng.actors as any
+
+  // Map-style: { actorId: api }
+  if (rawActors && typeof rawActors === 'object' && !Array.isArray(rawActors)) {
+    Object.entries<any>(rawActors).forEach(([id, api]) => {
+      const obj: THREE.Object3D | null =
+        (api && (api.object || api.root || api.obj)) || null
+      const name: string =
+        (api && (api.name || api.label)) ||
+        obj?.name ||
+        id
+
+      if (!obj && !name) return
+      push(id, name, obj, api)
+    })
+  } else if (Array.isArray(rawActors)) {
+    // Array-style fallback, just in case
+    ;(rawActors as any[]).forEach((a, idx) => {
+      const obj: THREE.Object3D | null =
+        (a && (a.object || a.root || a.obj)) || null
+      const id = (a && a.id) || obj?.name || `actor_${idx}`
+      const name =
+        (a && (a.name || a.label)) ||
+        obj?.name ||
+        id
+      push(id, name, obj, a)
+    })
+  }
+
+  // Fallback: traverse scene for actor roots
+  const scene: THREE.Scene | undefined = (window as any).__scene || eng.scene
+  if (scene) {
+    scene.traverse((o: any) => {
+      if (o.userData?.isActorRoot || /^actor_/i.test(o.name)) {
+        const id: string =
+          o.userData?.actorId ||
+          o.name ||
+          o.uuid
+        const name: string =
+          o.userData?.name ||
+          o.userData?.actorName ||
+          o.name ||
+          id
+        push(id, name, o, undefined)
+      }
+    })
+  }
+
+  // De-dupe by id: prefer entries that have a GLBinject api
+  const byId = new Map<string, SceneActor>()
+  for (const a of out) {
+    const cur = byId.get(a.id)
+    if (!cur || (!!a.api && !cur.api)) byId.set(a.id, a)
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name))
+}
+
+// Safe scale reader so we never crash on "reading 'x'"
+function getScaleFromObject(obj: THREE.Object3D | null): number {
+  if (!obj) return 1
+  const s: any = (obj as any).scale
+  if (!s || typeof s.x !== 'number') return 1
+  return Number.isFinite(s.x) ? s.x : 1
+}
+
+// Fallback focus helper if engine doesn't expose focus()
+function focusObjectFallback(obj: THREE.Object3D) {
+  const eng = getEngine()
+  const scene: THREE.Scene | undefined = (window as any).__scene || eng.scene
+  if (!scene) return
+
+  const cam: THREE.Camera | undefined =
+    eng.camera ||
+    (window as any).__camera ||
+    (eng.renderer && eng.renderer.camera)
+  if (!cam) return
+
+  const box = new THREE.Box3().setFromObject(obj)
+  const center = box.getCenter(new THREE.Vector3())
+  const size = box.getSize(new THREE.Vector3())
+  const radius = Math.max(size.x, size.y, size.z) || 1
+
+  const dir = new THREE.Vector3(0, 0.5, 1).normalize()
+  cam.position.copy(center.clone().add(dir.multiplyScalar(radius * 2.5)))
+  ;(cam as any).lookAt?.(center)
+}
+
+// Robust: only traverse when root is a real Object3D with traverse()
+function boneNames(root?: THREE.Object3D | null): string[] {
   const names: string[] = []
   if (!root) return names
-  root.traverse((o: any) => {
+  const anyRoot: any = root
+  if (typeof anyRoot.traverse !== 'function') {
+    return names
+  }
+
+  anyRoot.traverse((o: any) => {
     if (o.isBone && o.name) names.push(o.name)
   })
   return names.sort()
 }
 
 export default function ActorManager() {
-  const [actors, setActors] = useState(listSceneActors())
+  const [actors, setActors] = useState<SceneActor[]>(collectActors())
   const [selectedId, setSelectedId] = useState<string>('')
-
   const [scale, setScale] = useState<number>(1)
   const [rig, setRig] = useState<number>(6)
   const eng = useMemo(getEngine, [])
 
-  // refresh from engine periodically so new spawns show up
+  // keep list fresh
   useEffect(() => {
-    const refresh = () => setActors(listSceneActors())
-    const id = setInterval(refresh, 800)
-    return () => clearInterval(id)
+    const refresh = () => setActors(collectActors())
+    const id = window.setInterval(refresh, 800)
+    return () => window.clearInterval(id)
   }, [])
 
-  // default selection to first actor
-  useEffect(() => {
-    if (!selectedId && actors.length) setSelectedId(actors[0].id)
-  }, [actors, selectedId])
-
-  const cur = useMemo(
-    () => actors.find((a) => a.id === selectedId)?.obj || null,
+  // currently selected actor record + object/API
+  const current = useMemo(
+    () => actors.find((a) => a.id === selectedId) || null,
     [actors, selectedId],
   )
+  const curObj = current?.obj || null
+  const curApi = current?.api
 
-  // keep engine's active actor in sync (so ANIM + debugger know what to drive)
+  // auto-select first actor, and sync engine.activeActor
   useEffect(() => {
-    if (!selectedId) return
-    eng.setActiveActor?.(selectedId)
-  }, [selectedId, eng])
+    if (!selectedId && actors.length) {
+      const firstId = actors[0].id
+      setSelectedId(firstId)
+      eng.setActiveActor?.(firstId)
+    }
+  }, [actors, selectedId, eng])
 
-  // when current actor changes, update scale slider from its actual scale
+  // sync scale slider from current actor (safely)
   useEffect(() => {
-    if (cur) setScale(cur.scale.x) // assume uniform scale
-  }, [cur])
+    setScale(getScaleFromObject(curObj))
+  }, [curObj])
 
-  const onFocus = () => eng.focus?.(cur)
+  const handleSelect = (id: string) => {
+    setSelectedId(id)
+    eng.setActiveActor?.(id)
+  }
+
+  const onFocus = () => {
+    if (!curObj) return
+    if (eng.focusActor && current?.id) {
+      // optional helper on engine
+      eng.focusActor(current.id)
+    } else if (eng.focus) {
+      eng.focus(curObj)
+    } else {
+      focusObjectFallback(curObj)
+    }
+  }
+
   const onScale = (v: number) => {
     setScale(v)
-    if (cur) cur.scale.setScalar(v)
+    if (curApi?.setScale) {
+      // GLBinject-style actor
+      curApi.setScale(v)
+    } else if (curObj) {
+      // raw THREE actor
+      curObj.scale.setScalar(v)
+    }
   }
-  const inject = () => eng.anim?.injectOn?.(cur, rig)
-  const wag = () => eng.anim?.wag?.(cur)
 
-  // Parent/Bind tools
+  const inject = () => {
+    if (!current) return
+    if (curApi?.injectRig) {
+      // GLBinject rig injection
+      curApi.injectRig(rig)
+    } else if (eng.bones?.inject && curObj) {
+      // legacy fallback
+      eng.bones.inject(curObj, rig)
+    }
+  }
+
+  const wag = () => {
+    if (!current) return
+    if (curApi?.wag?.toggle) {
+      curApi.wag.toggle()
+    } else if (curApi?.wag?.start) {
+      curApi.wag.start()
+    } else if (eng.bones?.wag && curObj) {
+      // legacy fallback
+      eng.bones.wag(curObj)
+    }
+  }
+
+  // Parent / Bind tools
   const [childId, setChildId] = useState<string>('')
   const [parentId, setParentId] = useState<string>('')
   const [bone, setBone] = useState<string>('')
 
-  // default child/parent dropdowns to the selected actor
   useEffect(() => {
-    if (!selectedId) return
-    if (!childId) setChildId(selectedId)
-    if (!parentId) setParentId(selectedId)
-  }, [selectedId, childId, parentId])
+    if (!childId && current) setChildId(current.id)
+    if (!parentId && current) setParentId(current.id)
+  }, [current, childId, parentId])
 
-  const parentObj = actors.find((a) => a.id === parentId)?.obj
-  const childObj = actors.find((a) => a.id === childId)?.obj
-  const bones = useMemo(() => boneNames(parentObj || undefined), [parentObj])
+  const parentObj = actors.find((a) => a.id === parentId)?.obj || null
+  const childObj = actors.find((a) => a.id === childId)?.obj || null
+  const bones = useMemo(() => boneNames(parentObj), [parentObj])
 
   const makeChild = () => {
     if (!parentObj || !childObj || parentObj === childObj) return
-    // preserve world transform
+
     childObj.updateMatrixWorld()
     parentObj.updateMatrixWorld()
+
     const wp = new THREE.Vector3()
     const wq = new THREE.Quaternion()
     childObj.getWorldPosition(wp)
     childObj.getWorldQuaternion(wq)
+
     parentObj.add(childObj)
     childObj.position.copy(parentObj.worldToLocal(wp))
     childObj.quaternion.copy(wq)
   }
 
   const unparentToScene = () => {
-    const scene: THREE.Scene | undefined =
-      (window as any).__scene || eng.scene
+    const scene: THREE.Scene | undefined = (window as any).__scene || eng.scene
     if (!scene || !childObj) return
     scene.attach(childObj)
   }
@@ -148,14 +276,15 @@ export default function ActorManager() {
       <div className="label" style={{ marginBottom: 8 }}>
         Actors in Scene
       </div>
+
       <div className="row" style={{ gap: 8, marginBottom: 8 }}>
         <select
           className="input"
           value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
+          onChange={(e) => handleSelect(e.target.value)}
         >
-          {actors.map((a) => (
-            <option key={a.id} value={a.id}>
+          {actors.map((a, idx) => (
+            <option key={`${a.id}_${idx}`} value={a.id}>
               {a.name}
             </option>
           ))}
@@ -208,7 +337,9 @@ export default function ActorManager() {
           min={1}
           max={20}
           value={rig}
-          onChange={(e) => setRig(parseInt(e.target.value || '6'))}
+          onChange={(e) =>
+            setRig(parseInt(e.target.value || '6', 10))
+          }
         />
         <button className="btn" onClick={inject}>
           Inject
@@ -239,8 +370,8 @@ export default function ActorManager() {
             onChange={(e) => setChildId(e.target.value)}
             style={{ minWidth: 220 }}
           >
-            {actors.map((a) => (
-              <option key={a.id} value={a.id}>
+            {actors.map((a, idx) => (
+              <option key={`${a.id}_child_${idx}`} value={a.id}>
                 {a.name}
               </option>
             ))}
@@ -257,8 +388,8 @@ export default function ActorManager() {
             onChange={(e) => setParentId(e.target.value)}
             style={{ minWidth: 220 }}
           >
-            {actors.map((a) => (
-              <option key={a.id} value={a.id}>
+            {actors.map((a, idx) => (
+              <option key={`${a.id}_parent_${idx}`} value={a.id}>
                 {a.name}
               </option>
             ))}
@@ -282,8 +413,8 @@ export default function ActorManager() {
             style={{ minWidth: 220 }}
           >
             <option value="">(no bone)</option>
-            {bones.map((n) => (
-              <option key={n} value={n}>
+            {bones.map((n, idx) => (
+              <option key={`${n}_${idx}`} value={n}>
                 {n}
               </option>
             ))}
