@@ -8,6 +8,7 @@
   position:fixed;
   inset:0;
   pointer-events:none;
+  z-index:50;              /* NEW: keep HUD above the canvas */
 }
 
 /* compact mode tweaks */
@@ -42,7 +43,7 @@
 
   font-size:0;           /* hide the long text */
   opacity:.85;
-  pointer-events:all;
+  pointer-events:all;    /* keep clickable; set to none if you want it click-through */
 }
 
 /* show a simple “?” icon */
@@ -102,7 +103,7 @@
   padding:8px;
   min-height:80px;
 
-  pointer-events:all;
+  pointer-events:all;       /* re-enable interaction */
   backdrop-filter: blur(6px);
 
   width:100%;
@@ -117,6 +118,7 @@
   flex-wrap:wrap;
   margin-bottom:6px;
   min-height:28px;
+  pointer-events:all;       /* NEW: explicit for safety */
 }
 
 .dock-tab{
@@ -140,6 +142,8 @@
   height:auto;
   max-height:calc(100vh - 120px);
   overflow:auto;
+  overscroll-behavior:contain; /* NEW: prevent page from scrolling while scrolling the panel */
+  pointer-events:all;          /* NEW: explicit for safety */
 }
 
 /* remove old bottom dock resizer + add button */
@@ -221,6 +225,18 @@
   max-height:420px;
   overflow:auto;
   padding:8px;
+}
+
+/* enable all common controls inside panels/floats (belt & suspenders) */
+.dock-area .btn,
+.dock-area select,
+.dock-area input,
+.dock-area label,
+.floating .btn,
+.floating select,
+.floating input,
+.floating label{
+  pointer-events:all;        /* NEW: ensures clickability even if a parent was toggled */
 }
 
 .float-resizer{

@@ -57,10 +57,12 @@ export default function SpawnPanel() {
   }
 
   useEffect(() => {
-    const id = setInterval(refresh, 500)
-    return () => clearInterval(id)
+    const id = window.setInterval(refresh, 500)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // keep engine spawn UI in sync with HUD state
   useEffect(() => {
     if (!eng.spawns?.ui) return
     eng.spawns.ui.type = type
@@ -124,6 +126,11 @@ export default function SpawnPanel() {
     refresh()
   }
 
+  const spawnNow = (sp: SpawnPoint) => {
+    // Fire a single instance instantly at this spawn point
+    eng.spawns?.spawnOne?.(sp.id)
+  }
+
   const selected = list.find((s) => s.id === selectedId)
 
   return (
@@ -146,6 +153,9 @@ export default function SpawnPanel() {
           <div className="row" style={{ gap: 6 }}>
             <button className="btn" onClick={() => focusSpawn(selected)}>
               Focus
+            </button>
+            <button className="btn" onClick={() => spawnNow(selected)}>
+              Spawn
             </button>
             <button className="btn" onClick={() => duplicate(selected)}>
               Dup
@@ -291,6 +301,7 @@ export default function SpawnPanel() {
                 e.stopPropagation()
                 focusSpawn(s)
               }}
+              title="Frame this spawn in the camera"
             >
               ⊕
             </button>
@@ -298,8 +309,19 @@ export default function SpawnPanel() {
               className="btn"
               onClick={(e) => {
                 e.stopPropagation()
+                spawnNow(s)
+              }}
+              title="Spawn a single instance now"
+            >
+              ▶
+            </button>
+            <button
+              className="btn"
+              onClick={(e) => {
+                e.stopPropagation()
                 duplicate(s)
               }}
+              title="Duplicate this spawn point"
             >
               ⧉
             </button>

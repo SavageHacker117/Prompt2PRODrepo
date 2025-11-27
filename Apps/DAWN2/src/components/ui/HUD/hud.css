@@ -1,0 +1,253 @@
+/* ──────────────────────────────────────────────────────────────
+   HUD root: sits ABOVE the canvas, but only specific children
+   receive pointer events (panels, toolbars, floats, resizer).
+   ────────────────────────────────────────────────────────────── */
+.hud {
+  position: fixed;
+  inset: 0;
+  z-index: 50;                 /* comfortably above the canvas */
+  pointer-events: none;        /* opt-in per control below     */
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  color: #e6e6e6;
+}
+
+.hud *, .hud *::before, .hud *::after {
+  box-sizing: border-box;
+}
+
+/* Things that MUST be interactive */
+.hud .panel,
+.hud .dock-row,
+.hud .dock-bottom,
+.hud .dock-area,
+.hud .dock-tabbar,
+.hud .dock-body,
+.hud .dock-resizer,
+.hud .hud-toolbar,
+.hud .floating,
+.hud .spawn-quick,
+.hud .OptionsModal,
+.hud .modal-backdrop {
+  pointer-events: auto;
+}
+
+/* Informational overlays (click-through) */
+.hud .ghost-note {
+  pointer-events: none;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Toolbar (top round buttons)
+   ────────────────────────────────────────────────────────────── */
+.hud .hud-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud .hud-tool-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(20, 20, 25, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  outline: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 120ms ease, background 120ms ease;
+  user-select: none;
+}
+
+.hud .hud-tool-btn:hover { transform: translateY(-1px); }
+.hud .hud-tool-btn.on    { background: rgba(70, 120, 255, 0.65); }
+
+/* ──────────────────────────────────────────────────────────────
+   Docking areas
+   ────────────────────────────────────────────────────────────── */
+.hud .dock-row {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 54px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.hud.has-bottom .dock-row {
+  /* make room when a bottom dock exists */
+  bottom: 40%;
+}
+
+.hud .dock-bottom {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: 220px;
+}
+
+.hud .dock-area {
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+  background: rgba(15, 15, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+}
+
+/* Tabs */
+.hud .dock-tabbar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0));
+}
+
+.hud .dock-tabbar .tab {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(30,32,40,0.6);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.hud .dock-tabbar .tab.active {
+  background: rgba(70,120,255,0.65);
+  border-color: rgba(120,160,255,0.6);
+}
+
+/* Tab content */
+.hud .dock-body {
+  padding: 10px;
+  overflow: auto;
+}
+
+/* Splitter between bottom and world */
+.hud .dock-resizer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(40% + 220px);
+  height: 8px;
+  cursor: ns-resize;
+  background: transparent;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Panels (World/Spawns/Scene/Anim/Ocean panes)
+   ────────────────────────────────────────────────────────────── */
+.hud .panel {
+  background: rgba(18, 18, 24, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.hud .panel .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.hud .label {
+  font-size: 12px;
+  opacity: 0.9;
+  user-select: none;
+}
+
+.hud .input,
+.hud .panel select,
+.hud .panel input[type="range"],
+.hud .panel input[type="checkbox"] {
+  pointer-events: auto;
+}
+
+.hud .panel select,
+.hud .panel input[type="text"],
+.hud .panel input[type="number"] {
+  height: 28px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(8,8,12,0.9);
+  color: #eaeaea;
+}
+
+.hud .panel input[type="range"] {
+  width: 220px;
+}
+
+/* Buttons */
+.hud .btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(40, 44, 55, 0.85);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #eaeaea;
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease, transform 120ms ease;
+}
+.hud .btn:hover { background: rgba(70, 120, 255, 0.65); }
+.hud .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Spawn quick button */
+.hud .spawn-quick {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(20, 20, 26, 0.75);
+  border: 1px solid rgba(255,255,255,0.08);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+/* Floating windows (tear-offs) */
+.hud .floating {
+  position: absolute;
+  background: rgba(18, 18, 24, 0.85);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+/* Ghost note (instructions footer) */
+.hud .ghost-note {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+/* Make small controls feel crisp */
+.hud .panel .btn:hover,
+.hud .hud-tool-btn:hover {
+  filter: brightness(1.05);
+}
+
+/* Optional: improve readability on very bright backgrounds */
+@media (prefers-color-scheme: light) {
+  .hud .panel { background: rgba(16,16,22,0.78); }
+}
